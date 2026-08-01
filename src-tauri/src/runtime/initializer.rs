@@ -123,6 +123,8 @@ pub fn environment_status(paths: &AppPaths) -> Result<crate::domain::Environment
     } else {
         Ok(crate::domain::EnvironmentStatus::RepairRequired {
             reason_code: "RUNTIME_VALIDATION_FAILED".into(),
+            estimated_download_bytes: Some(manifest.estimates.download_bytes),
+            estimated_disk_bytes: Some(manifest.estimates.installed_bytes),
         })
     }
 }

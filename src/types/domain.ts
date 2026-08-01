@@ -19,7 +19,7 @@ export type EnvironmentStatus =
   | { type: "notInstalled"; estimatedDownloadBytes?: number; estimatedDiskBytes?: number }
   | { type: "installing"; runtimeVersion: string }
   | { type: "ready"; runtimeVersion: string; modelVersion: string; ffmpegVersion: string }
-  | { type: "repairRequired"; reasonCode: string }
+  | { type: "repairRequired"; reasonCode: string; estimatedDownloadBytes?: number; estimatedDiskBytes?: number }
   | { type: "unsupported"; reasonCode: string };
 
 export interface ProgressValue { kind: "determinate" | "indeterminate"; fraction?: number }

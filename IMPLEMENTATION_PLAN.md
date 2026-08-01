@@ -2780,7 +2780,7 @@ Before producing a public build:
 - [ ] Run worker self-test from a clean `%LOCALAPPDATA%\soufmer\` runtime.
 - [ ] Replace conservative download/install/disk estimates with measured release values.
 - [x] Confirm no manifest placeholder remains.
-- [ ] Confirm estimated download and disk size displayed by the UI.
+- [x] Confirm estimated download and disk size displayed by the UI.
 
 ---
 

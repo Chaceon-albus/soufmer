@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   backendEventSchema,
   diagnosticReportSchema,
+  environmentStatusSchema,
   initializationProgressSchema,
   licenseNoticesSchema,
   readyEnvironmentSchema,
@@ -49,5 +50,17 @@ describe("backend event schemas", () => {
     expect(licenseNoticesSchema.safeParse([]).success).toBe(false);
     expect(licenseNoticesSchema.safeParse([{ ...notice, source: "runtime" }]).success).toBe(false);
     expect(licenseNoticesSchema.safeParse([{ ...notice, text: "" }]).success).toBe(false);
+  });
+
+  it("accepts manifest estimates for installation and repair statuses", () => {
+    for (const status of [
+      { type: "notInstalled", estimatedDownloadBytes: 3_500_000_000, estimatedDiskBytes: 7_000_000_000 },
+      { type: "repairRequired", reasonCode: "RUNTIME_VALIDATION_FAILED", estimatedDownloadBytes: 3_500_000_000, estimatedDiskBytes: 7_000_000_000 },
+    ]) {
+      expect(environmentStatusSchema.safeParse(status).success).toBe(true);
+    }
+    const snakeCase = environmentStatusSchema.parse({ type: "repairRequired", reasonCode: "RUNTIME_VALIDATION_FAILED", estimated_download_bytes: 1 });
+    expect("estimatedDownloadBytes" in snakeCase).toBe(false);
+    expect(environmentStatusSchema.safeParse({ type: "notInstalled", estimatedDownloadBytes: -1 }).success).toBe(false);
   });
 });

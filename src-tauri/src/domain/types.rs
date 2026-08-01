@@ -119,6 +119,10 @@ pub enum EnvironmentStatus {
     },
     RepairRequired {
         reason_code: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        estimated_download_bytes: Option<u64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        estimated_disk_bytes: Option<u64>,
     },
     Unsupported {
         reason_code: String,
@@ -223,6 +227,20 @@ mod tests {
             })
             .unwrap(),
             serde_json::json!({"type":"notInstalled"})
+        );
+        assert_eq!(
+            serde_json::to_value(EnvironmentStatus::RepairRequired {
+                reason_code: "RUNTIME_VALIDATION_FAILED".into(),
+                estimated_download_bytes: Some(3_500_000_000),
+                estimated_disk_bytes: Some(7_000_000_000),
+            })
+            .unwrap(),
+            serde_json::json!({
+                "type":"repairRequired",
+                "reasonCode":"RUNTIME_VALIDATION_FAILED",
+                "estimatedDownloadBytes":3_500_000_000_u64,
+                "estimatedDiskBytes":7_000_000_000_u64
+            })
         );
         let error = AppError::new(
             ErrorCode::EnvironmentNotInitialized,
