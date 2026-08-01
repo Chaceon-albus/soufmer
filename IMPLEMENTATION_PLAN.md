@@ -1927,7 +1927,7 @@ Do not include authorization headers or download credentials.
 - [x] Add an MIT `LICENSE` for original project code.
 - [ ] Add an initial `THIRD_PARTY_NOTICES.md` with placeholders for MSST, model, uv, FFmpeg,
   Tauri, and major runtime components.
-- [ ] Confirm a working application name and reverse-domain identifier in one central location.
+- [x] Confirm a working application name and reverse-domain identifier in one central location.
 - [x] Confirm Node.js 22.12 or newer is available.
 - [ ] Confirm Windows Tauri prerequisites are installed: Microsoft C++ build tools and WebView2 development/runtime requirements.
 - [ ] Record actual installed versions in a local development note, not as hard repository pins.
@@ -1963,7 +1963,7 @@ pnpm --version
 - [x] Add Lucide React.
 - [x] Add ESLint and TypeScript checking if the scaffold does not already include suitable scripts.
 - [x] Add `engines` with broad minimums, not exact versions.
-- [ ] Commit `pnpm-lock.yaml` and `src-tauri/Cargo.lock`.
+- [x] Commit `pnpm-lock.yaml` and `src-tauri/Cargo.lock`.
 
 ### Initial scripts
 
@@ -2036,15 +2036,16 @@ Adjust to the scaffold's TypeScript project layout rather than forcing this exac
 
 ### Tasks
 
-- [ ] Add the Tauri dialog plugin for file and folder selection.
-- [ ] Add the Tauri opener plugin for revealing output files/directories with narrow permissions.
-- [ ] Configure Tauri capabilities with the smallest required permissions.
-- [ ] Do not add broad shell permissions.
-- [ ] Create Rust domain types for settings, requests, progress, results, and errors.
-- [ ] Create the narrow command API skeleton.
-- [ ] Implement a fake backend task that emits initialization and processing progress.
+- [x] Add the Tauri dialog plugin for file and folder selection.
+- [x] Add the Tauri opener plugin for revealing output files/directories with narrow permissions.
+- [x] Configure Tauri capabilities with the smallest required permissions.
+- [x] Do not add broad shell permissions.
+- [x] Create Rust domain types for settings, requests, progress, results, and errors.
+- [x] Create the narrow command API skeleton.
+- [x] Supersede the planned fake task with the completed production initialization and batch task
+  implementations.
 - [x] Implement frontend event subscriptions with cleanup.
-- [ ] Connect the reducer to actual Tauri commands and fake backend events.
+- [x] Connect the reducer to actual Tauri commands and typed production backend events.
 - [x] Handle stale event sequence numbers and task IDs.
 - [x] Add one reducer lifecycle test.
 
@@ -2074,19 +2075,19 @@ This phase proves the complete GUI lifecycle before downloads and model work beg
 
 ### Tasks
 
-- [ ] Resolve `FOLDERID_LocalAppData` and enforce the exact `%LOCALAPPDATA%\soufmer\` root.
-- [ ] Prove with a focused test that the executable directory and current working directory do not
+- [x] Resolve `FOLDERID_LocalAppData` and enforce the exact `%LOCALAPPDATA%\soufmer\` root.
+- [x] Prove with a focused test that the executable directory and current working directory do not
   influence the data root.
-- [ ] Implement the runtime directory layout.
-- [ ] Implement the application-wide initialization mutex and active-bootstrap metadata.
-- [ ] Implement atomic JSON writes.
-- [ ] Implement settings load/save with defaults and schema version.
-- [ ] Implement runtime manifest parsing and validation.
-- [ ] Add manifest documentation.
-- [ ] Implement active runtime state reading.
-- [ ] Implement `get_environment_status`.
-- [ ] Replace mocked environment status in the UI.
-- [ ] Add focused tests for manifest parsing and invalid hash formatting.
+- [x] Implement the runtime directory layout.
+- [x] Implement the application-wide initialization mutex and active-bootstrap metadata.
+- [x] Implement atomic JSON writes.
+- [x] Implement settings load/save with defaults and schema version.
+- [x] Implement runtime manifest parsing and validation.
+- [x] Add manifest documentation.
+- [x] Implement active runtime state reading.
+- [x] Implement `get_environment_status`.
+- [x] Replace mocked environment status in the UI.
+- [x] Add focused tests for manifest parsing and invalid hash formatting.
 
 ### Acceptance criteria
 
@@ -2102,15 +2103,15 @@ This phase proves the complete GUI lifecycle before downloads and model work beg
 
 ### Tasks
 
-- [ ] Implement a child process command builder using executable path and argument vector.
-- [ ] Hide child console windows on Windows.
-- [ ] Capture stdout and stderr separately.
-- [ ] Implement line-oriented stdout handling.
-- [ ] Implement bounded stderr buffering plus file logging.
-- [ ] Implement Windows Job Object ownership.
-- [ ] Implement process-tree termination.
-- [ ] Connect cancellation tokens to active processes.
-- [ ] Add a small test helper executable or use a safe system command in a Windows-only integration test to verify cancellation.
+- [x] Implement a child process command builder using executable path and argument vector.
+- [x] Hide child console windows on Windows.
+- [x] Capture stdout and stderr separately.
+- [x] Implement line-oriented stdout handling.
+- [x] Implement bounded stderr buffering plus file logging.
+- [x] Implement Windows Job Object ownership.
+- [x] Implement process-tree termination.
+- [x] Connect cancellation tokens to active processes.
+- [x] Add a small test helper executable or use a safe system command in a Windows-only integration test to verify cancellation.
 
 ### Acceptance criteria
 
@@ -2125,17 +2126,17 @@ This phase proves the complete GUI lifecycle before downloads and model work beg
 
 ### Tasks
 
-- [ ] Implement download staging and `.part` files.
-- [ ] Emit byte progress.
-- [ ] Implement cancellation.
-- [ ] Implement bounded retries.
-- [ ] Implement optional HTTP Range resume.
-- [ ] Implement SHA-256 verification.
-- [ ] Implement ZIP extraction with path traversal protection.
-- [ ] Install the fixed FFmpeg archive into a versioned directory.
-- [ ] Validate `ffmpeg -version` and `ffprobe -version`.
+- [x] Implement download staging and `.part` files.
+- [x] Emit byte progress.
+- [x] Implement cancellation.
+- [x] Implement bounded retries.
+- [x] Implement optional HTTP Range resume.
+- [x] Implement SHA-256 verification.
+- [x] Implement ZIP extraction with path traversal protection.
+- [x] Install the fixed FFmpeg archive into a versioned directory.
+- [x] Validate `ffmpeg -version` and `ffprobe -version`.
 - [x] Record the FFmpeg build version and license files.
-- [ ] Add a small local HTTP test fixture or mocked downloader test only for core resume/hash behavior.
+- [x] Add a small local HTTP test fixture or mocked downloader test only for core resume/hash behavior.
 
 ### Acceptance criteria
 
@@ -2165,12 +2166,12 @@ This phase proves the complete GUI lifecycle before downloads and model work beg
 - [x] Add request validation.
 - [x] Add JSON Lines protocol utilities.
 - [x] Add worker self-test.
-- [ ] Add the worker project and vendored MSST tree to the deterministic embedded bootstrap inputs.
-- [ ] Add a release check that rejects Git/VCS MSST dependencies and absolute local paths in
+- [x] Add the worker project and vendored MSST tree to the deterministic embedded bootstrap inputs.
+- [x] Add a release check that rejects Git/VCS MSST dependencies and absolute local paths in
   `uv.lock`.
-- [ ] Implement private uv environment variables.
-- [ ] Implement `uv python install 3.11`.
-- [ ] Implement the production sync command from Section 17 with `--locked`, `--no-dev`,
+- [x] Implement private uv environment variables.
+- [x] Implement `uv python install 3.11`.
+- [x] Implement the production sync command from Section 17 with `--locked`, `--no-dev`,
   `--extra cuda`, `--no-editable`, `--managed-python`, and `--no-python-downloads`.
 - [x] Add core Python protocol tests only.
 
@@ -2234,14 +2235,14 @@ This phase proves the complete GUI lifecycle before downloads and model work beg
 
 ### Tasks
 
-- [ ] Implement FFprobe JSON parsing.
-- [ ] Implement supported input detection.
-- [ ] Reject more than two channels.
-- [ ] Implement model-input conversion with SoXR precision 32.
-- [ ] Validate generated model-input properties.
-- [ ] Implement job directory creation and cleanup.
-- [ ] Add generated short-audio test fixtures.
-- [ ] Add an integration test for model-input sample rate, channels, and Float32 format.
+- [x] Implement FFprobe JSON parsing.
+- [x] Implement supported input detection.
+- [x] Reject more than two channels.
+- [x] Implement model-input conversion with SoXR precision 32.
+- [x] Validate generated model-input properties.
+- [x] Implement job directory creation and cleanup.
+- [x] Add generated short-audio test fixtures.
+- [x] Add an integration test for model-input sample rate, channels, and Float32 format.
 
 ### Acceptance criteria
 
@@ -2256,18 +2257,18 @@ This phase proves the complete GUI lifecycle before downloads and model work beg
 
 ### Tasks
 
-- [ ] Implement Float32 residual using FFmpeg with normalization disabled.
-- [ ] Add a focused test for the exact subtraction filter argument, including the unescaped
+- [x] Implement Float32 residual using FFmpeg with normalization disabled.
+- [x] Add a focused test for the exact subtraction filter argument, including the unescaped
   `weights=1 -1` value.
-- [ ] Reuse the exact model-input WAV.
-- [ ] Implement FLAC encoding policy.
-- [ ] Implement and verify a single explicit triangular-dither step for 16/24-bit FLAC output.
-- [ ] Implement WAV Float32 output.
-- [ ] Implement partial-file output and FFprobe validation.
-- [ ] Implement atomic publication or safe replacement.
-- [ ] Implement output naming and conflict policies.
-- [ ] Add zero-vocals identity integration test.
-- [ ] Add full-vocals cancellation integration test.
+- [x] Reuse the exact model-input WAV.
+- [x] Implement FLAC encoding policy.
+- [x] Implement and verify a single explicit triangular-dither step for 16/24-bit FLAC output.
+- [x] Implement WAV Float32 output.
+- [x] Implement partial-file output and FFprobe validation.
+- [x] Implement atomic publication or safe replacement.
+- [x] Implement output naming and conflict policies.
+- [x] Add zero-vocals identity integration test.
+- [x] Add full-vocals cancellation integration test.
 
 ### Acceptance criteria
 
@@ -2283,14 +2284,14 @@ This phase proves the complete GUI lifecycle before downloads and model work beg
 
 ### Tasks
 
-- [ ] Decode a source-native stereo Float32 WAV at the original sample rate.
-- [ ] Resample vocals to the source sample rate with SoXR precision 32.
-- [ ] Implement residual with source duration authority.
-- [ ] Implement source sample rate output validation.
-- [ ] Implement common source bit-depth mapping for FLAC.
-- [ ] Log duration and sample-rate comparison data.
-- [ ] Add explicit TODO references for alignment and clipping refinements.
-- [ ] Add short tests for 48 kHz and 96 kHz generated inputs.
+- [x] Decode a source-native stereo Float32 WAV at the original sample rate.
+- [x] Resample vocals to the source sample rate with SoXR precision 32.
+- [x] Implement residual with source duration authority.
+- [x] Implement source sample rate output validation.
+- [x] Implement common source bit-depth mapping for FLAC.
+- [x] Log duration and sample-rate comparison data.
+- [x] Add explicit TODO references for alignment and clipping refinements.
+- [x] Add short tests for 48 kHz and 96 kHz generated inputs.
 
 ### Acceptance criteria
 
@@ -2306,19 +2307,19 @@ This phase proves the complete GUI lifecycle before downloads and model work beg
 
 ### Tasks
 
-- [ ] Implement file and folder enumeration.
-- [ ] Implement recursion and output-directory exclusion.
-- [ ] Implement deterministic sorting.
-- [ ] Probe all inputs before processing.
-- [ ] Plan outputs and conflicts before processing.
-- [ ] Calculate total audio duration.
-- [ ] Implement duration-weighted overall progress.
-- [ ] Implement current-item stage progress.
-- [ ] Process strictly one item at a time.
-- [ ] Delete large temporary files after each item.
-- [ ] Continue after an individual item failure when safe.
-- [ ] Emit item and batch completion events.
-- [ ] Connect real backend progress to the existing GUI.
+- [x] Implement file and folder enumeration.
+- [x] Implement recursion and output-directory exclusion.
+- [x] Implement deterministic sorting.
+- [x] Probe all inputs before processing.
+- [x] Plan outputs and conflicts before processing.
+- [x] Calculate total audio duration.
+- [x] Implement duration-weighted overall progress.
+- [x] Implement current-item stage progress.
+- [x] Process strictly one item at a time.
+- [x] Delete large temporary files after each item.
+- [x] Continue after an individual item failure when safe.
+- [x] Emit item and batch completion events.
+- [x] Connect real backend progress to the existing GUI.
 
 ### Acceptance criteria
 
@@ -2334,13 +2335,13 @@ This phase proves the complete GUI lifecycle before downloads and model work beg
 
 ### Tasks
 
-- [ ] Connect first-launch environment status to the initialization flow.
-- [ ] Add `initialize_environment` and the first-use confirmation dialog.
-- [ ] Run the real initialization state machine before processing is enabled.
+- [x] Connect first-launch environment status to the initialization flow.
+- [x] Add `initialize_environment` and the first-use confirmation dialog.
+- [x] Run the real initialization state machine before processing is enabled.
 - [x] Reuse the progress dialog.
 - [x] Enable batch submission only after successful initialization.
 - [ ] Implement retry after recoverable initialization failure.
-- [ ] Implement repair behavior for incomplete runtime state.
+- [x] Implement repair behavior for incomplete runtime state.
 
 ### Acceptance criteria
 
@@ -2357,16 +2358,16 @@ This phase proves the complete GUI lifecycle before downloads and model work beg
 
 ### Tasks
 
-- [ ] Complete Rust domain error taxonomy.
-- [ ] Map worker errors.
-- [ ] Map FFmpeg/FFprobe failures.
-- [ ] Implement diagnostic report storage and copy action.
-- [ ] Implement localized recovery messages.
-- [ ] Implement final completion summary.
-- [ ] Implement failed-item list.
-- [ ] Persist safe user settings.
-- [ ] Add reveal-output-directory action.
-- [ ] Verify cancellation messaging and terminal states.
+- [x] Complete Rust domain error taxonomy.
+- [x] Map worker errors.
+- [x] Map FFmpeg/FFprobe failures.
+- [x] Implement diagnostic report storage and copy action.
+- [x] Implement localized recovery messages.
+- [x] Implement final completion summary.
+- [x] Implement failed-item list.
+- [x] Persist safe user settings.
+- [x] Add reveal-output-directory action.
+- [x] Verify cancellation messaging and terminal states.
 
 ### Acceptance criteria
 
@@ -2384,12 +2385,12 @@ Keep this phase intentionally small.
 
 ### Rust tests
 
-- [ ] Manifest parse and validation.
-- [ ] Hash verification success/failure.
-- [ ] Input enumeration and output exclusion.
-- [ ] Conflict naming.
-- [ ] Progress aggregation.
-- [ ] Cancellation transition.
+- [x] Manifest parse and validation.
+- [x] Hash verification success/failure.
+- [x] Input enumeration and output exclusion.
+- [x] Conflict naming.
+- [x] Progress aggregation.
+- [x] Cancellation transition.
 
 ### Python tests
 
@@ -2431,13 +2432,13 @@ Keep this phase intentionally small.
 
 ### Tasks
 
-- [ ] Configure the Windows GUI subsystem so release builds do not open a console window.
-- [ ] Configure application icon and metadata.
-- [ ] Implement the deterministic bootstrap archive and `include_bytes!` integration from Section
+- [x] Configure the Windows GUI subsystem so release builds do not open a console window.
+- [x] Configure application icon and metadata.
+- [x] Implement the deterministic bootstrap archive and `include_bytes!` integration from Section
   8.
-- [ ] Embed uv, the worker, the pinned and patched MSST snapshot, configuration, manifest, and
+- [x] Embed uv, the worker, the pinned and patched MSST snapshot, configuration, manifest, and
   licenses; do not configure them as Tauri `bundle.resources` or external sidecars.
-- [ ] Add build and extraction tests for entry hashes, path traversal, duplicate paths, size
+- [x] Add build and extraction tests for entry hashes, path traversal, duplicate paths, size
   limits, reparse points, and corrupted payloads.
 - [x] Ensure release manifest has no placeholders.
 - [x] Include third-party license files.
