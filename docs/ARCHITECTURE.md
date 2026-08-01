@@ -46,6 +46,12 @@ state files only after validation and self-test. Downloads, caches, logs, diagno
 temporary files remain below the same root. User-selected inputs and final outputs are the only
 intentional exceptions.
 
+The main Tauri window is constructed programmatically after the native WebView2 prerequisite
+check. Its explicit WebView2 profile directory is `%LOCALAPPDATA%\soufmer\webview\main`; startup
+validates and creates that directory beneath the private root before passing it to Tauri. No
+declarative window is created, so Tauri cannot first initialize the identifier-derived default
+`%LOCALAPPDATA%\com.soufmer.desktop\EBWebView` profile.
+
 The portable executable embeds a deterministic bootstrap archive. It does not depend on a sibling
 resource directory and never writes beside itself. Python, locked packages, FFmpeg, and the model
 are installed or downloaded into the private runtime during a confirmed first-run initialization.

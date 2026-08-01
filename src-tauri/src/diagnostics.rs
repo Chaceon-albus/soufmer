@@ -224,8 +224,8 @@ fn configured_runtime_identity() -> Option<ConfiguredRuntimeIdentity> {
 fn active_runtime_identity(paths: &AppPaths) -> Option<ActiveRuntimeIdentity> {
     let current: CurrentRuntimeRecord = read_optional_json(&paths.current_runtime_file())?;
     let self_test_path = paths
-        .runtime_versions()
-        .join(&current.id)
+        .runtime_version(&current.id)
+        .ok()?
         .join("self-test.json");
     let self_test =
         read_optional_json::<SelfTestRecord>(&self_test_path).map(|record| SelfTestIdentity {
@@ -336,15 +336,24 @@ mod tests {
     fn reports_include_runtime_context_and_keep_uuid_bounds() {
         let root = std::env::temp_dir().join(format!("soufmer-diagnostic-{}", Uuid::new_v4()));
         let paths = AppPaths::from_test_root(root.clone());
+        let runtime_id = format!("runtime-2026.08.01.1-cuda-012345abcdef-{}", Uuid::new_v4());
         fs::create_dir_all(root.join("state")).unwrap();
-        fs::create_dir_all(root.join("runtime/versions/runtime-test")).unwrap();
+        fs::create_dir_all(paths.runtime_version(&runtime_id).unwrap()).unwrap();
         fs::write(
             paths.current_runtime_file(),
-            r#"{"id":"runtime-test","manifestDigest":"digest","activatedAt":"2026-01-01T00:00:00Z"}"#,
+            serde_json::to_vec(&serde_json::json!({
+                "id": runtime_id,
+                "manifestDigest": "digest",
+                "activatedAt": "2026-01-01T00:00:00Z"
+            }))
+            .unwrap(),
         )
         .unwrap();
         fs::write(
-            root.join("runtime/versions/runtime-test/self-test.json"),
+            paths
+                .runtime_version(&runtime_id)
+                .unwrap()
+                .join("self-test.json"),
             r#"{"manifestDigest":"digest","profile":"cuda","worker":{"device":"cuda:0"}}"#,
         )
         .unwrap();
@@ -355,7 +364,7 @@ mod tests {
         assert!(report.contains("appVersion"));
         assert!(report.contains("ffmpegVersion"));
         assert!(report.contains("cudaProfile") || report.contains("cudaIndexUrl"));
-        assert!(report.contains("runtime-test"));
+        assert!(report.contains(&runtime_id));
         assert!(read(&paths, "../../not-a-uuid").is_err());
         let oversized_id = Uuid::new_v4().to_string();
         fs::write(

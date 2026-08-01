@@ -18,15 +18,33 @@ use std::{
 use task::TaskManager;
 
 pub fn run() {
-    configure_logging();
     if !webview2::ensure_runtime_or_show_recovery() {
         return;
     }
+    let webview_data =
+        match runtime::AppPaths::discover().and_then(|paths| paths.ensure_webview_data()) {
+            Ok(webview_data) => webview_data,
+            Err(_) => {
+                webview2::show_private_data_recovery();
+                return;
+            }
+        };
+    configure_logging();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(Arc::new(TaskManager::default()))
+        .setup(move |app| {
+            tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
+                .title("Soufmer")
+                .inner_size(960.0, 720.0)
+                .min_inner_size(640.0, 480.0)
+                .resizable(true)
+                .data_directory(webview_data)
+                .build()?;
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             commands::get_environment_status,
             commands::get_app_settings,

@@ -11,15 +11,27 @@ const MACHINE_CLIENT_KEY: &str =
     "SOFTWARE\\WOW6432Node\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}";
 const USER_CLIENT_KEY: &str =
     "Software\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}";
+const PRIVATE_DATA_ERROR_TITLE: &str = "Soufmer - 应用数据不可用 / Application data unavailable";
+const PRIVATE_DATA_ERROR_MESSAGE: &str = "Soufmer 无法访问其应用数据文件夹。请确认当前 Windows 用户可以写入本地应用数据，然后重新打开 Soufmer。\n\nSoufmer cannot access its application data folder. Check that this Windows account can write to Local AppData, then reopen Soufmer.\n\nDiagnostic code: LOCAL_DATA_UNAVAILABLE";
 
 pub fn ensure_runtime_or_show_recovery() -> bool {
     if has_runtime() {
         return true;
     }
-    let title = wide("Soufmer - WebView2 prerequisite");
-    let message = wide(
+    show_error_message(
+        "Soufmer - WebView2 prerequisite",
         "未检测到 Microsoft Edge WebView2 Runtime。请安装或更新 Evergreen WebView2 Runtime 后重新打开 Soufmer。\n\nMicrosoft Edge WebView2 Runtime was not found. Install or update the Evergreen WebView2 Runtime, then reopen Soufmer.",
     );
+    false
+}
+
+pub fn show_private_data_recovery() {
+    show_error_message(PRIVATE_DATA_ERROR_TITLE, PRIVATE_DATA_ERROR_MESSAGE);
+}
+
+fn show_error_message(title: &str, message: &str) {
+    let title = wide(title);
+    let message = wide(message);
     unsafe {
         MessageBoxW(
             std::ptr::null_mut(),
@@ -28,7 +40,6 @@ pub fn ensure_runtime_or_show_recovery() -> bool {
             MB_OK | MB_ICONERROR,
         );
     }
-    false
 }
 
 fn has_runtime() -> bool {

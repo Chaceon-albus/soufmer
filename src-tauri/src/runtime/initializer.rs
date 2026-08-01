@@ -105,7 +105,7 @@ pub fn environment_status(paths: &AppPaths) -> Result<crate::domain::Environment
             estimated_disk_bytes: Some(manifest.estimates.installed_bytes),
         });
     };
-    let runtime = paths.runtime_versions().join(&current.id);
+    let runtime = paths.runtime_version(&current.id)?;
     if current.manifest_digest == manifest.digest(&manifest_bytes)
         && validate_runtime(
             paths,
@@ -146,7 +146,7 @@ pub fn resolve_active_runtime(paths: &AppPaths) -> Result<ActiveRuntime, AppErro
             "active runtime manifest digest mismatch",
         ));
     }
-    let root = paths.runtime_versions().join(&current.id);
+    let root = paths.runtime_version(&current.id)?;
     validate_runtime(paths, &root, &manifest, &current.manifest_digest)?;
     Ok(ActiveRuntime {
         ffmpeg: root.join("tools/ffmpeg").join(&manifest.ffmpeg.ffmpeg_path),
@@ -200,7 +200,7 @@ pub fn initialize(
         &manifest.digest(&source)[..12],
         Uuid::new_v4()
     );
-    let runtime = paths.runtime_versions().join(&runtime_id);
+    let runtime = paths.runtime_version(&runtime_id)?;
     if runtime.exists() {
         return Err(invalid("inactive runtime version already exists"));
     }
@@ -684,6 +684,7 @@ fn private_environment(
         &temp,
         &paths.uv_cache(),
         &runtime.join("python"),
+        &runtime.join("python-bin"),
         &runtime.join("venv"),
         &cache,
         &paths.logs(),
@@ -700,9 +701,14 @@ fn private_environment(
             runtime.join("python").into_os_string(),
         ),
         (
+            "UV_PYTHON_BIN_DIR".into(),
+            runtime.join("python-bin").into_os_string(),
+        ),
+        (
             "UV_PROJECT_ENVIRONMENT".into(),
             runtime.join("venv").into_os_string(),
         ),
+        ("PYTHONNOUSERSITE".into(), "1".into()),
         (
             "HF_HOME".into(),
             paths.models().join("cache").into_os_string(),
@@ -1063,12 +1069,16 @@ impl Drop for RuntimeMutex {
 #[cfg(test)]
 mod tests {
     use super::{
-        Entry, parse_self_test_event, safe_zip_path, verify_archive_descriptor,
+        Entry, embedded_manifest_bytes, parse_self_test_event, private_environment,
+        resolve_active_runtime, safe_zip_path, verify_archive_descriptor,
         verify_extracted_entry_descriptor,
     };
     use crate::domain::ErrorCode;
     use crate::process::ProcessOutput;
+    use crate::runtime::AppPaths;
     use sha2::{Digest, Sha256};
+    use std::{collections::BTreeMap, fs, path::PathBuf};
+    use uuid::Uuid;
 
     fn output(exit_code: Option<i32>, lines: &[&str]) -> ProcessOutput {
         ProcessOutput {
@@ -1078,6 +1088,72 @@ mod tests {
             stderr: String::new(),
             stderr_truncated: false,
         }
+    }
+
+    #[test]
+    fn private_environment_keeps_uv_and_python_state_under_the_private_root() {
+        let root = std::env::temp_dir().join(format!("soufmer-env-test-{}", Uuid::new_v4()));
+        let paths = AppPaths::from_test_root(root.clone());
+        let runtime = paths.runtime_versions().join("runtime-test");
+        let environment = private_environment(&paths, &runtime).unwrap();
+        let environment = environment
+            .into_iter()
+            .map(|(name, value)| (name.to_string_lossy().into_owned(), PathBuf::from(value)))
+            .collect::<BTreeMap<_, _>>();
+
+        assert_eq!(environment["UV_CACHE_DIR"], paths.uv_cache());
+        assert_eq!(environment["UV_PYTHON_INSTALL_DIR"], runtime.join("python"));
+        assert_eq!(environment["UV_PYTHON_BIN_DIR"], runtime.join("python-bin"));
+        assert_eq!(environment["UV_PROJECT_ENVIRONMENT"], runtime.join("venv"));
+        assert_eq!(environment["PYTHONNOUSERSITE"], PathBuf::from("1"));
+        for name in [
+            "TEMP",
+            "TMP",
+            "UV_CACHE_DIR",
+            "UV_PYTHON_INSTALL_DIR",
+            "UV_PYTHON_BIN_DIR",
+            "UV_PROJECT_ENVIRONMENT",
+            "HF_HOME",
+            "TORCH_HOME",
+            "XDG_CACHE_HOME",
+            "MPLCONFIGDIR",
+            "NUMBA_CACHE_DIR",
+            "SOUFMER_RUNTIME_LOG_DIR",
+        ] {
+            assert!(environment[name].starts_with(&root), "{name}");
+        }
+        assert!(runtime.join("python-bin").is_dir());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn tampered_runtime_id_is_rejected_before_creating_outside_directories() {
+        let base = std::env::temp_dir().join(format!("soufmer-runtime-id-test-{}", Uuid::new_v4()));
+        let root = base.join("soufmer");
+        let outside = base.join("escaped-runtime");
+        let paths = AppPaths::from_test_root(root);
+        fs::create_dir_all(paths.current_runtime_file().parent().unwrap()).unwrap();
+        let manifest_bytes = embedded_manifest_bytes().unwrap();
+        let manifest =
+            crate::runtime::RuntimeManifest::parse(std::str::from_utf8(&manifest_bytes).unwrap())
+                .unwrap();
+        fs::write(
+            paths.current_runtime_file(),
+            serde_json::to_vec(&serde_json::json!({
+                "schemaVersion": 1,
+                "id": outside,
+                "manifestDigest": manifest.digest(&manifest_bytes),
+                "activatedAt": "2026-01-01T00:00:00Z"
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+        let error = resolve_active_runtime(&paths).unwrap_err();
+
+        assert_eq!(error.code, ErrorCode::ManifestInvalid);
+        assert!(!outside.exists());
+        fs::remove_dir_all(base).unwrap();
     }
     #[test]
     fn self_test_requires_one_ready_cuda_event() {

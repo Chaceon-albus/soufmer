@@ -10,17 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [
-      {
-        "label": "main",
-        "title": "Soufmer",
-        "width": 960,
-        "height": 720,
-        "minWidth": 640,
-        "minHeight": 480,
-        "resizable": true
-      }
-    ],
+    "windows": [],
     "security": {
       "capabilities": ["main-capability"]
     }

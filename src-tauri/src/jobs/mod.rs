@@ -593,22 +593,7 @@ impl BatchExecutor for ProductionBatchExecutor {
         fs::rename(&temporary, &request).map_err(job_error)?;
         let lines = Arc::new(std::sync::Mutex::new(Vec::new()));
         let capture = Arc::clone(&lines);
-        let mut spec = ProcessSpec::new(&runtime.python);
-        spec.arguments = [
-            "-m",
-            runtime.worker_module.as_str(),
-            "separate",
-            "--request",
-            request
-                .to_str()
-                .ok_or_else(|| AppError::new(ErrorCode::InferenceFailed, "request path invalid"))?,
-        ]
-        .into_iter()
-        .map(Into::into)
-        .collect();
-        spec.current_dir = Some(runtime.worker_cwd.clone());
-        spec.environment = runtime.environment.clone();
-        spec.stderr_log = Some(paths.logs.join("worker.stderr.log"));
+        let spec = worker_process_spec(runtime, paths, &request)?;
         let result = ProcessRunner::run(
             spec,
             cancellation.clone(),
@@ -749,6 +734,39 @@ impl BatchExecutor for ProductionBatchExecutor {
         }
         publish_partial(&output.partial_path, &output.final_path, output.overwrite)
     }
+}
+
+fn worker_process_spec(
+    runtime: &BatchRuntime,
+    paths: &JobPaths,
+    request: &Path,
+) -> Result<ProcessSpec, AppError> {
+    let request = request
+        .to_str()
+        .ok_or_else(|| AppError::new(ErrorCode::InferenceFailed, "request path invalid"))?;
+    let temp = paths.root.join("tmp");
+    fs::create_dir_all(&temp).map_err(job_error)?;
+    let mut environment = runtime.environment.clone();
+    for name in ["TEMP", "TMP"] {
+        environment.retain(|(existing, _)| !existing.to_string_lossy().eq_ignore_ascii_case(name));
+        environment.push((name.into(), temp.clone().into_os_string()));
+    }
+    let mut spec = ProcessSpec::new(&runtime.python);
+    spec.arguments = [
+        "-I",
+        "-m",
+        runtime.worker_module.as_str(),
+        "separate",
+        "--request",
+        request,
+    ]
+    .into_iter()
+    .map(Into::into)
+    .collect();
+    spec.current_dir = Some(runtime.worker_cwd.clone());
+    spec.environment = environment;
+    spec.stderr_log = Some(paths.logs.join("worker.stderr.log"));
+    Ok(spec)
 }
 fn absolute(path: &Path) -> Result<String, AppError> {
     if path.exists() {
@@ -1508,6 +1526,59 @@ mod tests {
             logs: root.join("logs"),
         }
     }
+
+    #[test]
+    fn worker_process_is_isolated_with_exact_args_and_job_temp() {
+        let root = temp_dir();
+        let app_paths = AppPaths::from_test_root(root.join("private"));
+        let paths =
+            create_job_paths(&app_paths, "00000000-0000-0000-0000-000000000000", "item-1").unwrap();
+        let request = paths.root.join("request.json");
+        let mut runtime = runtime(&root);
+        runtime.environment = vec![
+            ("TEMP".into(), root.join("old-temp").into_os_string()),
+            ("tmp".into(), root.join("old-tmp").into_os_string()),
+            (
+                "HF_HOME".into(),
+                root.join("private-cache").into_os_string(),
+            ),
+            ("PYTHONNOUSERSITE".into(), "1".into()),
+        ];
+
+        let spec = worker_process_spec(&runtime, &paths, &request).unwrap();
+        assert_eq!(spec.executable, runtime.python);
+        assert_eq!(
+            spec.arguments,
+            [
+                "-I",
+                "-m",
+                "accompaniment_worker",
+                "separate",
+                "--request",
+                request.to_str().unwrap(),
+            ]
+            .into_iter()
+            .map(std::ffi::OsString::from)
+            .collect::<Vec<_>>()
+        );
+        assert_eq!(spec.current_dir, Some(runtime.worker_cwd));
+        assert_eq!(spec.stderr_log, Some(paths.logs.join("worker.stderr.log")));
+        let environment = spec
+            .environment
+            .into_iter()
+            .map(|(name, value)| (name.to_string_lossy().to_uppercase(), PathBuf::from(value)))
+            .collect::<std::collections::BTreeMap<_, _>>();
+        let job_temp = paths.root.join("tmp");
+        assert_eq!(environment["TEMP"], job_temp);
+        assert_eq!(environment["TMP"], job_temp);
+        assert_eq!(environment["HF_HOME"], root.join("private-cache"));
+        assert_eq!(environment["PYTHONNOUSERSITE"], PathBuf::from("1"));
+        assert!(job_temp.is_dir());
+        assert!(job_temp.starts_with(&paths.root));
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
     #[test]
     fn runner_is_sequential_and_continues_after_an_item_failure() {
         let root = temp_dir();
