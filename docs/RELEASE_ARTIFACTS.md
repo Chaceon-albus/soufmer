@@ -52,6 +52,8 @@ clean-machine values before public release.
 
 The build now generates and embeds a deterministic hash-manifested bootstrap archive, validates
 its entries during extraction, and exposes the audited component attributions in the application.
-Still required before public release: a clean locked CUDA sync using the embedded uv executable,
+`pnpm tauri build --no-bundle` produced an x64 Windows GUI executable, and a copy containing no
+sibling files opened successfully from an otherwise empty development-machine directory. Still
+required before public release: a clean locked CUDA sync using the embedded uv executable,
 first-run FFmpeg/checkpoint download validation, worker CUDA self-test, full GPU audio smoke test,
-raw executable build, and clean-profile one-file verification.
+and clean-profile or VM verification.

@@ -17,5 +17,7 @@ repository toolchain pins.
 | Microsoft Edge WebView2 Runtime | 150.0.4078.105 |
 
 The machine satisfies the Windows prerequisites needed to compile and run a Tauri 2 application.
+The Vite development server is bound explicitly to `127.0.0.1:1420` and excludes locked Rust
+target files from its watcher so `pnpm tauri dev` starts reliably on Windows.
 Release testing still requires the clean-profile and missing-WebView2 cases described in
 `docs/SMOKE_TEST.md`.

@@ -1954,7 +1954,7 @@ pnpm --version
 ### Tasks
 
 - [x] Scaffold a Tauri 2 project using the React + TypeScript + pnpm template.
-- [ ] Confirm `pnpm tauri dev` opens the application.
+- [x] Confirm `pnpm tauri dev` opens the application.
 - [x] Configure Vite according to the current Tauri Vite guide.
 - [x] Add Tailwind CSS using the current Vite plugin integration.
 - [x] Initialize shadcn/ui for the existing Vite project.
@@ -2445,8 +2445,8 @@ Keep this phase intentionally small.
 - [x] Add an in-app open-source licenses view backed by the embedded/extracted notices.
 - [x] Confirm FFmpeg build license obligations.
 - [x] Confirm model attribution and revision.
-- [ ] Build the raw Windows executable with `pnpm tauri build --no-bundle`.
-- [ ] Copy only `soufmer.exe` to a clean directory and verify that no sibling file is required.
+- [x] Build the raw Windows executable with `pnpm tauri build --no-bundle`.
+- [x] Copy only `soufmer.exe` to a clean directory and verify that no sibling file is required.
 - [ ] Test the portable executable on a clean Windows user profile or VM with system WebView2.
 - [ ] Test the native missing-WebView2 recovery path.
 - [ ] Test first-run initialization without a global Python, Git, FFmpeg, or uv installation.
@@ -2460,8 +2460,8 @@ Keep this phase intentionally small.
 
 ### Portable release behavior
 
-- Distribute exactly one code-signed `soufmer.exe`; do not produce an MSI/NSIS artifact for the
-  MVP.
+- Distribute exactly one `soufmer.exe`; do not produce an MSI/NSIS artifact for the MVP. Code
+  signing remains a Phase 17 release-hardening task.
 - Require no administrator privileges and never write beside the executable.
 - Do not bundle the multi-gigabyte runtime.
 - Use supported Windows' Evergreen WebView2 and the native prerequisite error described in Section
@@ -2778,7 +2778,7 @@ Before producing a public build:
 - [ ] Perform a clean locked CUDA sync and confirm a second sync changes nothing.
 - [ ] Confirm the self-test reports the expected CUDA build suffix and runs a tiny CUDA operation.
 - [ ] Run worker self-test from a clean `%LOCALAPPDATA%\soufmer\` runtime.
-- [ ] Replace zero download/install/disk estimates with measured release values.
+- [ ] Replace conservative download/install/disk estimates with measured release values.
 - [x] Confirm no manifest placeholder remains.
 - [ ] Confirm estimated download and disk size displayed by the UI.
 

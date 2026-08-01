@@ -50,8 +50,9 @@ The normal fast tests do not download or load the model.
 
 The audited runtime identities and SHA-256 digests are recorded in
 `docs/RUNTIME_MANIFEST.md`, `docs/RELEASE_ARTIFACTS.md`, and `THIRD_PARTY_NOTICES.md`. A release is
-valid only after the clean locked CUDA sync, real GPU inference, raw one-file build, and
-clean-profile smoke checks in `docs/SMOKE_TEST.md`.
+valid for public distribution only after the clean locked CUDA sync, real GPU inference, and
+clean-profile smoke checks in `docs/SMOKE_TEST.md`. The raw one-file build and development-machine
+clean-directory launch have passed.
 
 ## License
 

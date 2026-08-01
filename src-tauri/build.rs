@@ -151,10 +151,6 @@ fn build_bootstrap() -> Result<(), String> {
         archive.len()
     );
     fs::write(out_dir.join("embedded_bootstrap.rs"), generated).map_err(io_error)?;
-    println!(
-        "cargo:warning=soufmer bootstrap archive: {} bytes sha256={archive_hash}",
-        archive.len()
-    );
     Ok(())
 }
 
