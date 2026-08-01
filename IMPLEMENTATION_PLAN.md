@@ -1953,16 +1953,16 @@ pnpm --version
 
 ### Tasks
 
-- [ ] Scaffold a Tauri 2 project using the React + TypeScript + pnpm template.
+- [x] Scaffold a Tauri 2 project using the React + TypeScript + pnpm template.
 - [ ] Confirm `pnpm tauri dev` opens the application.
-- [ ] Configure Vite according to the current Tauri Vite guide.
-- [ ] Add Tailwind CSS using the current Vite plugin integration.
-- [ ] Initialize shadcn/ui for the existing Vite project.
-- [ ] Configure the `@/` import alias consistently in TypeScript and Vite.
-- [ ] Add only the initial shadcn components needed for the static screen.
-- [ ] Add Lucide React.
-- [ ] Add ESLint and TypeScript checking if the scaffold does not already include suitable scripts.
-- [ ] Add `engines` with broad minimums, not exact versions.
+- [x] Configure Vite according to the current Tauri Vite guide.
+- [x] Add Tailwind CSS using the current Vite plugin integration.
+- [x] Initialize shadcn/ui for the existing Vite project.
+- [x] Configure the `@/` import alias consistently in TypeScript and Vite.
+- [x] Add only the initial shadcn components needed for the static screen.
+- [x] Add Lucide React.
+- [x] Add ESLint and TypeScript checking if the scaffold does not already include suitable scripts.
+- [x] Add `engines` with broad minimums, not exact versions.
 - [ ] Commit `pnpm-lock.yaml` and `src-tauri/Cargo.lock`.
 
 ### Initial scripts
@@ -1998,20 +1998,20 @@ Adjust to the scaffold's TypeScript project layout rather than forcing this exac
 
 ### Tasks
 
-- [ ] Install and configure `i18next` and `react-i18next`.
-- [ ] Add structurally matching `en.json` and `zh-CN.json`.
-- [ ] Make `zh-CN` the default locale and English the fallback.
-- [ ] Implement the main form with mocked local state.
-- [ ] Implement file/folder input selector UI.
-- [ ] Implement input and output path fields with disabled manual editing or controlled editing, depending on the chosen UX.
-- [ ] Implement processing mode radio cards.
-- [ ] Implement advanced options collapsible.
-- [ ] Implement environment status component using mocked status.
-- [ ] Implement progress dialog using mocked initialization and processing states.
-- [ ] Implement completion dialog.
-- [ ] Implement error dialog.
+- [x] Install and configure `i18next` and `react-i18next`.
+- [x] Add structurally matching `en.json` and `zh-CN.json`.
+- [x] Make `zh-CN` the default locale and English the fallback.
+- [x] Implement the main form with mocked local state.
+- [x] Implement file/folder input selector UI.
+- [x] Implement input and output path fields with disabled manual editing or controlled editing, depending on the chosen UX.
+- [x] Implement processing mode radio cards.
+- [x] Implement advanced options collapsible.
+- [x] Implement environment status component using mocked status.
+- [x] Implement progress dialog using mocked initialization and processing states.
+- [x] Implement completion dialog.
+- [x] Implement error dialog.
 - [ ] Establish spacing, typography, focus states, disabled states, and Windows high-DPI behavior.
-- [ ] Ensure no Chinese text is embedded directly in JSX.
+- [x] Ensure no Chinese text is embedded directly in JSX.
 
 ### Visual direction
 
@@ -2043,10 +2043,10 @@ Adjust to the scaffold's TypeScript project layout rather than forcing this exac
 - [ ] Create Rust domain types for settings, requests, progress, results, and errors.
 - [ ] Create the narrow command API skeleton.
 - [ ] Implement a fake backend task that emits initialization and processing progress.
-- [ ] Implement frontend event subscriptions with cleanup.
+- [x] Implement frontend event subscriptions with cleanup.
 - [ ] Connect the reducer to actual Tauri commands and fake backend events.
-- [ ] Handle stale event sequence numbers and task IDs.
-- [ ] Add one reducer lifecycle test.
+- [x] Handle stale event sequence numbers and task IDs.
+- [x] Add one reducer lifecycle test.
 
 ### Fake task behavior
 
@@ -2337,8 +2337,8 @@ This phase proves the complete GUI lifecycle before downloads and model work beg
 - [ ] Connect first-launch environment status to the initialization flow.
 - [ ] Add `initialize_environment` and the first-use confirmation dialog.
 - [ ] Run the real initialization state machine before processing is enabled.
-- [ ] Reuse the progress dialog.
-- [ ] Enable batch submission only after successful initialization.
+- [x] Reuse the progress dialog.
+- [x] Enable batch submission only after successful initialization.
 - [ ] Implement retry after recoverable initialization failure.
 - [ ] Implement repair behavior for incomplete runtime state.
 
@@ -2401,8 +2401,8 @@ Keep this phase intentionally small.
 
 ### Frontend tests
 
-- [ ] Reducer normal lifecycle.
-- [ ] Main-form validation.
+- [x] Reducer normal lifecycle.
+- [x] Main-form validation.
 
 ### Audio integration tests
 

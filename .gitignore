@@ -271,3 +271,14 @@ $RECYCLE.BIN/
 # - pnpm-lock.yaml
 # - src-tauri/Cargo.lock
 # - worker/uv.lock
+
+# The generic Python template ignores every directory named `lib`; the React
+# application intentionally keeps checked-in IPC and validation code here.
+!/src/lib/
+!/src/lib/**
+
+# Tauri's icon generator emits mobile/macOS variants that are outside this
+# Windows-only MVP. Keep the Windows executable and appx assets.
+/src-tauri/icons/android/
+/src-tauri/icons/ios/
+/src-tauri/icons/icon.icns
