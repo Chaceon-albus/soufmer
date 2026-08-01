@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "modelCard": {
+    "fileName": "README.md",
+    "rawUrl": "https://huggingface.co/KimberleyJSN/melbandroformer/raw/ac9b0614ab3cd7f77219e18ba494dfd93956c348/README.md",
+    "sha256": "3e0e15fa0c5cc81675bd69af8eb469d128a725c1a7bfc71f03b7877b7b650567",
+    "sizeBytes": 21,
+    "license": "mit",
+    "revisionApiUrl": "https://huggingface.co/api/models/KimberleyJSN/melbandroformer/revision/ac9b0614ab3cd7f77219e18ba494dfd93956c348"
+  },
+  "model": {
+    "repository": "https://huggingface.co/KimberleyJSN/melbandroformer",
+    "revision": "ac9b0614ab3cd7f77219e18ba494dfd93956c348",
+    "fileName": "MelBandRoformer.ckpt",
+    "downloadUrl": "https://huggingface.co/KimberleyJSN/melbandroformer/resolve/ac9b0614ab3cd7f77219e18ba494dfd93956c348/MelBandRoformer.ckpt",
+    "sha256": "87201f4d31afb5bc79993230fc49446918425574db48c01c405e44f365c7559e",
+    "sizeBytes": 913106900,
+    "source": {
+      "apiTreeUrl": "https://huggingface.co/api/models/KimberleyJSN/melbandroformer/tree/ac9b0614ab3cd7f77219e18ba494dfd93956c348?recursive=true&expand=true",
+      "gitLfsPointerUrl": "https://huggingface.co/KimberleyJSN/melbandroformer/raw/ac9b0614ab3cd7f77219e18ba494dfd93956c348/MelBandRoformer.ckpt"
+    }
+  }
+}

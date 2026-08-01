@@ -2196,15 +2196,15 @@ This phase proves the complete GUI lifecycle before downloads and model work beg
 
 ### Tasks
 
-- [ ] Retrieve the exact upstream commit selected in Phase 7 and verify its SHA before copying.
-- [ ] Record the exact copied-file inventory and source hashes.
-- [ ] Store that inventory in `worker/vendor/source-manifest.json` and verify it in the vendor
+- [x] Retrieve the exact upstream commit selected in Phase 7 and verify its SHA before copying.
+- [x] Record the exact copied-file inventory and source hashes.
+- [x] Store that inventory in `worker/vendor/source-manifest.json` and verify it in the vendor
   refresh/check script.
-- [ ] Copy only the inference import closure into the packaged vendor namespace.
-- [ ] Preserve the exact upstream MIT license and copyright headers.
-- [ ] Add `worker/vendor/UPSTREAM.md` with repository URL, full commit, copy date, file inventory,
+- [x] Copy only the inference import closure into the packaged vendor namespace.
+- [x] Preserve the exact upstream MIT license and copyright headers.
+- [x] Add `worker/vendor/UPSTREAM.md` with repository URL, full commit, copy date, file inventory,
   dependency audit, and ordered local patches.
-- [ ] Add the exact Kimberley configuration from the same pinned MSST snapshot and record its hash.
+- [x] Add the exact Kimberley configuration from the same pinned MSST snapshot and record its hash.
 - [ ] Verify the non-editable worker install contains the vendored MSST package and required
   configuration resources.
 - [ ] Re-run the clean dependency audit and regenerate `uv.lock` if the copied import closure

@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "upstream": {
+    "repository": "https://github.com/ZFTurbo/Music-Source-Separation-Training",
+    "commit": "e247dfe4abc1f17c69dff719207fe045dc04413a",
+    "archiveSha256": "ae9563ebdf1e194565bee6fe7e6ebaed57c3cc17db9838181941b75c995dc88c",
+    "retrievedAt": "2026-07-30"
+  },
+  "files": [
+    {
+      "path": "msst/models/bs_roformer/mel_band_roformer.py",
+      "upstreamPath": "models/bs_roformer/mel_band_roformer.py",
+      "upstreamSha256": "3b4a57ab268933900172e05fb76dd9e8acc1eb770c745d583a4e42b94b79ec15",
+      "vendoredSha256": "b28ccd7cd435a775f943c51e144e6ec34e3b900b3b81ca155d921e1e8fc6ab57"
+    },
+    {
+      "path": "msst/models/bs_roformer/attend.py",
+      "upstreamPath": "models/bs_roformer/attend.py",
+      "upstreamSha256": "0459d799ade55541df2994b0becf7aec12214491360c5a06e346f6d615eaed15",
+      "vendoredSha256": "89430354cec6acb2eb63ffa8ce5350d2ac72d971622c8b0086cb42db70f2bb31"
+    },
+    {
+      "path": "msst/configs/KimberleyJensen/config_vocals_mel_band_roformer_kj.yaml",
+      "upstreamPath": "configs/KimberleyJensen/config_vocals_mel_band_roformer_kj.yaml",
+      "upstreamSha256": "f63f38eb1e6e40a7db0dade714a5ae257555dd8748f4e774eae8679275a81926",
+      "vendoredSha256": "f63f38eb1e6e40a7db0dade714a5ae257555dd8748f4e774eae8679275a81926"
+    },
+    {
+      "path": "MSST_LICENSE",
+      "upstreamPath": "LICENSE",
+      "upstreamSha256": "3282dc057695ef5b9a64909a7092ca40b2c292c232580fc6ace6e5d665cc0207",
+      "vendoredSha256": "3282dc057695ef5b9a64909a7092ca40b2c292c232580fc6ace6e5d665cc0207"
+    }
+  ],
+  "patches": [
+    {
+      "path": "patches/0001-private-package-and-stderr-logging.patch",
+      "sha256": "8dc847e6e4984510c3996e1781847eb41c30d1f7fb5ca163d0913c4cb9365523"
+    }
+  ]
+}
