@@ -8,7 +8,7 @@ The application is intended for non-technical users. It must ship as one movable
 command-line details, initialize its private runtime on first launch, process files sequentially,
 and present clear Simplified Chinese UI text and progress feedback.
 
-This file defines the working rules for coding agents. Read it before modifying the repository.
+This file defines the repository-wide working rules for coding agents. Read it before modifying the repository. Keep root-level guidance precise and broadly applicable; place genuinely subsystem-specific overrides in a nested `AGENTS.md` or `AGENTS.override.md` close to the affected code instead of duplicating or bloating this file.
 
 ## 2. Product scope
 
@@ -671,36 +671,69 @@ Do not create layers or abstractions that are unused. Prefer cohesive modules wi
 
 ## 17. Agent workflow
 
-For each implementation phase:
+### Task workflow
 
-1. Read `IMPLEMENTATION_PLAN.md` and identify the current incomplete phase.
-2. Inspect existing code before making architectural changes.
-3. Implement the smallest coherent vertical slice.
-4. Keep command-line details hidden from the normal UI.
-5. Add only the focused tests required by this document.
-6. Run the relevant quality gates.
-7. Update the phase checklist and any decisions that changed.
-8. Create a local Git checkpoint when the main agent judges the change significant or the phase is
-   complete.
-9. Do not silently expand scope.
+1. Read this file, applicable nested instructions, and the relevant `IMPLEMENTATION_PLAN.md` sections before editing.
+2. Inspect the implementation before making architectural changes.
+3. Establish the repository state with `git status --short`, `git diff --stat`, `git diff`, and `git log --oneline --decorate -n 15`. When untracked files exist, also run `git ls-files --others --exclude-standard`.
+4. Treat pre-existing tracked and untracked changes as user work until their purpose is understood. Never discard them merely to obtain a clean worktree.
+5. Define the smallest coherent result, acceptance criteria, and narrowest useful validation.
+6. Implement one independently reviewable unit at a time. Add only focused tests justified by Section 13 and run focused checks while iterating.
+7. Update `IMPLEMENTATION_PLAN.md`, manifests, lockfiles, translations, and documentation when the unit changes their recorded state.
+8. Commit each completed unit under the policy below before switching concerns.
+9. Run all applicable Section 14 quality gates before declaring a phase or release checkpoint complete.
+10. Do not stop after planning unless the user requested planning only or a destructive or materially ambiguous decision requires confirmation. Do not silently expand scope.
 
-### Git checkpoint policy
+### Commit policy
 
-- `IMPLEMENTATION_PLAN.md` is tracked project documentation. Update it in the same commit as the
-  implementation state it describes.
-- The main agent decides checkpoint boundaries. A completed phase always requires a commit;
-  significant architecture decisions, runtime/dependency changes, or coherent vertical slices
-  normally require one as well. Small incomplete edits may accumulate until they form a coherent
-  checkpoint.
-- Before committing, inspect the worktree, preserve unrelated user changes, run the applicable
-  quality gates, update the plan, and stage only files that belong to the checkpoint.
-- Use a concise English commit message that describes the completed result.
-- Do not amend, rebase, reset, or otherwise rewrite existing commits unless the user explicitly
-  asks.
-- Never push, create a pull request, or otherwise update a remote as part of this workflow. A
-  remote action requires a separate explicit user request.
-- In multi-agent work, the main agent owns checkpoint decisions and commits unless it explicitly
-  delegates that responsibility.
+A commit unit is an independently reviewable, internally consistent, and independently testable logical change. A plan phase may contain several commit units and normally should produce several commits when it spans distinct concerns.
+
+Typical units are one behavior or module with focused tests; one narrow bug fix; one behavior-preserving refactor; one dependency/runtime/vendor update with required lockfiles, manifests, hashes, licenses, and validation; or one focused build, documentation, localization, or test-infrastructure change.
+
+Elapsed time, file count, individual file edits, a broad phase boundary, and catch-all labels such as "misc changes" are not sufficient boundaries. Commit only when one coherent unit is complete, relevant checks pass or a missing check is documented, required supporting artifacts are included, no known incomplete behavior is presented as complete, and the staged diff contains only that unit.
+
+Commit before switching to an unrelated subsystem or concern, beginning a separate dependency/runtime/vendor change, pausing with completed work, or declaring a phase complete. Keep the worktree bounded to one active incomplete concern whenever practical; do not wait for the end of a large phase.
+
+### Staging and commit procedure
+
+Before every commit:
+
+1. Run `git status --short` and inspect all changed and untracked paths.
+2. Inspect the intended path diffs.
+3. Stage with explicit pathspecs. Do not use `git add .` or `git add -A`.
+4. Run `git diff --cached --check`.
+5. Review the complete staged patch with `git diff --cached`; exclude unrelated user work.
+6. Run or confirm the relevant focused validation.
+7. Commit with a concise English subject describing the completed result.
+8. Run `git status --short` and `git log -1 --oneline` immediately afterward.
+
+Additional rules:
+
+- Keep behavior and its tests together unless the tests are an independent infrastructure change.
+- Update `IMPLEMENTATION_PLAN.md` with the implementation it describes; do not mark an item complete before required validation succeeds.
+- Commit required reproducible lockfiles and manifests, but never caches, temporary files, local environments, build outputs, secrets, tokens, or accidental downloads.
+- Avoid WIP, empty, and knowingly broken commits. Leave incomplete work uncommitted and report it.
+- Follow repository history. If no convention exists, use a concise Conventional Commit-style subject such as `fix(worker): reject invalid model metadata`.
+
+### Recovery and Git safety
+
+When resuming with existing changes, classify them by purpose and provenance. Validate and commit complete coherent units; preserve incomplete work uncommitted; preserve uncertain changes and report them instead of guessing. If unrelated work cannot be isolated safely, ask before committing.
+
+Do not use `git reset`, `git clean`, `git restore`, `git checkout --`, `git stash`, amend, rebase, squash, or other history-rewriting or destructive operations unless the user explicitly authorizes the exact action. Do not bypass hooks or suppress warnings merely to make a commit pass.
+
+Never push, force-push, create a pull request, publish a release, create a remote tag, or modify remotes without a separate explicit user request.
+
+### Subagent coordination
+
+Use subagents only for bounded work that materially improves speed or review quality. Medium reasoning is the default; use higher reasoning for complex tracing, security review, or difficult edge cases.
+
+Give each subagent a narrow objective, allowed files, constraints, acceptance criteria, validation commands, and a report format covering files, test results, assumptions, risks, and unresolved issues. Parallelize read-only or independent work; serialize writes that share files, interfaces, manifests, or architecture.
+
+The main agent reviews actual diffs and evidence and alone stages and commits. Subagents must not stage, commit, rewrite history, discard work, stash, push, tag, or modify remotes.
+
+### Completion report
+
+On completion or a genuine blocker, report completed plan items, remaining work, commit hashes and subjects, validation results, intentionally uncommitted files with reasons, and material assumptions or risks.
 
 When requirements are ambiguous, prefer the simplest behavior consistent with this file and the implementation plan. Mark deferred audio-quality refinements with explicit TODO references instead of inventing unverified signal-processing behavior.
 
@@ -722,3 +755,7 @@ Use current official documentation when setup syntax has changed:
 - uv storage locations and overrides: https://docs.astral.sh/uv/reference/storage/
 - Music-Source-Separation-Training: https://github.com/ZFTurbo/Music-Source-Separation-Training
 - KimberleyJSN MelBandRoformer: https://huggingface.co/KimberleyJSN/melbandroformer
+- OpenAI Codex AGENTS.md guidance: https://developers.openai.com/codex/agent-configuration/agents-md
+- OpenAI Codex subagents guidance: https://developers.openai.com/codex/agent-configuration/subagents
+- OpenAI prompting guidance: https://developers.openai.com/codex/prompting
+- AGENTS.md open format: https://agents.md/

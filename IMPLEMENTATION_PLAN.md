@@ -1,7 +1,7 @@
 # Accompaniment Extractor — Detailed Implementation Plan
 
-Status: Validated draft for implementation
-Last reviewed: 2026-07-30
+Status: Implementation substantially complete; end-to-end stabilization and portable validation in progress
+Last reviewed: 2026-08-01
 Target platform: Windows 10/11 x64
 Default UI locale: Simplified Chinese (`zh-CN`)
 Development language: English
@@ -24,6 +24,26 @@ A phase is complete only when its acceptance criteria and applicable quality gat
 
 This file is the committed `IMPLEMENTATION_PLAN.md`. Update its phase checklists and Decision Log
 in the same commit as each significant implementation checkpoint or completed phase.
+
+### Current implementation checkpoint
+
+This checkpoint is based on the committed checklist and the project owner's manual observations. It
+is not a substitute for inspecting the current Git worktree, recent commits, diagnostics, and test
+results at the start of the next agent run.
+
+- Phases 0 through 15 are implemented according to the checklist, except for the final visual/high-DPI
+  polish item in Phase 2 and the real-model GPU inference smoke test in Phase 8.
+- The raw standalone executable builds and starts, and first-run private runtime initialization has
+  succeeded on the current development machine.
+- Most Phase 16 packaging work is complete, including the one-file artifact, but clean-profile,
+  prerequisite, concurrency, and write-boundary validation remain open.
+- The MVP is not yet end-to-end complete because real audio processing currently fails with
+  `INFERENCE_FAILED`. Canonicalized Windows paths are reaching external-process and worker boundaries
+  with verbatim prefixes such as `\\?\UNC\server\share\...`.
+- Initialization step 4 (`uv sync`) can remain visually indeterminate for a long time without useful
+  activity detail, and the main-window layout and color system still need final UX polish.
+- Phase 16A is the next priority. Complete it before treating Phase 16 acceptance criteria as passed
+  or beginning optional Phase 17 release hardening.
 
 ---
 
@@ -422,9 +442,26 @@ interface InitializationProgress {
   bytesCompleted?: number;
   bytesTotal?: number;
   bytesPerSecond?: number;
+  completedUnits?: number;
+  totalUnits?: number;
   detail?: string;
 }
+
+interface InitializationActivity {
+  stepId: InitializationProgress["stepId"];
+  level: "status" | "download" | "install" | "warning";
+  message: string;
+  packageName?: string;
+  completedUnits?: number;
+  totalUnits?: number;
+}
 ```
+
+`InitializationActivity.message` is a short, sanitized, localized-or-localizable activity message,
+not an arbitrary terminal transcript. The backend may derive it from trusted state transitions or
+conservatively recognized uv output, but it must remove ANSI control sequences, command lines,
+credentials, authorization headers, and unbounded paths. Store the full bounded stderr separately in
+diagnostics.
 
 ### Batch progress
 
@@ -493,7 +530,15 @@ Initial provisional weights:
 | Self-test | 0.04 |
 | Activate | 0.01 |
 
-For download steps, map byte progress into the step's weight. For uv sync or other commands without reliable total work, keep current progress indeterminate and only advance overall progress at safe milestones.
+For download steps, map byte progress into the step's weight. For uv sync or other commands without
+reliable total work, keep current progress indeterminate and only advance overall progress at safe
+milestones. Never fabricate a percentage from elapsed time, parse a cosmetic spinner as progress, or
+let either progress bar move backward or restart.
+
+For long indeterminate work, continue to show the stable step number, elapsed time, a concise current
+activity message, and a bounded activity feed. If reliable byte totals or completed/total unit counts
+become available, the current-step bar may transition to determinate mode. The overall bar remains
+stage-weighted and monotonic.
 
 ---
 
@@ -833,12 +878,17 @@ Use a small number of stable event names.
 
 ```text
 runtime://progress
+runtime://activity
 batch://progress
 batch://item-completed
 batch://completed
 task://failed
 task://cancelled
 ```
+
+`runtime://activity` carries `InitializationActivity` entries for the bounded activity feed. It is
+informational and must not be required to reconstruct task state; `runtime://progress` and terminal
+events remain authoritative.
 
 ### Item completion payload
 
@@ -887,6 +937,29 @@ Conceptual command:
 ```
 
 The Rust process launcher passes arguments directly and does not invoke a shell.
+
+### Windows path boundary
+
+Rust filesystem canonicalization on Windows may produce verbatim paths beginning with `\\?\`.
+Keep canonical or verbatim paths internally when they are useful for containment and identity checks,
+but do not serialize them directly into the normal worker request or pass them to FFmpeg, FFprobe, uv,
+or Python unless that exact downstream boundary has been proven to require and support them.
+
+After canonical validation, derive an external-process path representation with these rules:
+
+- `\\?\C:\path` becomes `C:\path`.
+- `\\?\UNC\server\share\path` becomes `\\server\share\path`.
+- Already-normal drive and UNC paths remain unchanged.
+- Device namespaces such as `\\.\`, volume GUID paths, malformed prefixes, and paths that cannot be
+  represented safely for the target process are rejected rather than rewritten heuristically.
+- If a path requires verbatim syntax solely because of its length and downstream compatibility has
+  not been demonstrated, fail before process launch with a stable localized `PATH_UNSUPPORTED` error
+  instead of allowing a generic `INFERENCE_FAILED`.
+
+Use separate variables or types for canonical internal paths, user-display paths, and process/worker
+paths so a later refactor cannot accidentally reintroduce the prefix. Apply the conversion at the
+external-process/request boundary, after security checks and before JSON serialization or argument
+construction.
 
 The worker validates the request again before importing the model:
 
@@ -1396,12 +1469,17 @@ All external processes should use one backend abstraction that supports:
 - Argument vector.
 - Environment variables.
 - Working directory.
+- Explicit conversion from validated canonical paths to target-compatible process paths.
 - stdout mode: JSON Lines, machine progress, or log only.
 - stderr capture.
 - Cancellation.
 - Exit code.
 - Windows hidden-window flags.
 - Windows process-tree ownership.
+
+The command builder must not receive a canonical `\\?\` path accidentally through a generic
+`PathBuf` conversion. Path conversion failures must be reported before child creation with the
+original path retained only in bounded diagnostics.
 
 ### Windows Job Object
 
@@ -1522,8 +1600,12 @@ command performs no post-sync `uv pip install` or `uv add`. `--no-editable` ensu
 environment does not depend on the retained project source path through an editable link, so the
 worker build configuration must include the vendored MSST package and configuration resources.
 
-Capture logs. Keep current progress indeterminate unless a reliable uv progress integration is
-implemented.
+Capture stdout and stderr incrementally with `--color never` or equivalent ANSI-free output.
+Do not depend on uv's terminal spinner or progress-bar rendering as a machine protocol. Emit
+sanitized `runtime://activity` messages for recognized phases such as resolving, downloading,
+preparing, installing, and auditing packages. Keep the current-step bar indeterminate unless uv or a
+separate trusted measurement provides reliable byte or unit totals. Preserve the complete bounded
+command output in diagnostics rather than exposing raw terminal output in the normal UI.
 
 ### Step 5 — Download model
 
@@ -1605,10 +1687,37 @@ Initial retry policy:
 Initial target:
 
 - One main Tauri window.
-- Minimum practical size around 720 × 600.
-- Responsive enough for common Windows display scaling.
+- Start near 760 × 720 and set a measured minimum size no smaller than approximately 720 × 660;
+  increase either value if the final collapsed layout clips at supported display scaling.
+- Use a full-height flex/grid shell with `html`, `body`, and the application root constrained to the
+  viewport and with page-level overflow hidden.
+- Keep the environment status and primary action in a persistent bottom action region so they are
+  visible without scrolling.
+- Keep advanced options collapsed by default and reduce excess vertical spacing before increasing
+  density elsewhere.
+- At 100%, 125%, and 150% Windows scaling, the normal collapsed main screen must have no page-level
+  scrollbar and no clipped controls. Test 175% and 200% as accessibility cases; if the screen cannot
+  fit inside the monitor work area, use a bounded internal `ScrollArea` for the optional content
+  region rather than hiding content or restoring a page scrollbar.
 - No separate progress window.
 - Use an in-window dialog or overlay.
+
+### Final color system
+
+Use a restrained Final Cut-inspired magenta family rather than the existing blue accent:
+
+- Display accent: `#FF8AD8`, matching HSB 320°, 46%, 100%. Use it for progress fills, selected
+  decoration, small icons, and other non-text emphasis.
+- Primary filled controls: `#C12B8F` with white text; hover/pressed may use `#A61E73`.
+- Strong border or focus accent on light surfaces: approximately `#E85BC0` or a darker token that
+  maintains at least 3:1 non-text contrast.
+- Soft selected/background tint: approximately `#FFF0FA` with dark foreground text.
+- Destructive, warning, success, and neutral colors keep their semantic meanings and must not be
+  recolored pink.
+
+Implement the palette through shared shadcn/Tailwind theme tokens, not repeated component-local
+classes. Do not place white text on `#FF8AD8`; the bright display accent is too light for normal white
+text. Keep visible keyboard focus and verify text, component, and state contrast against WCAG 2.2.
 
 ## 19.2 Main form
 
@@ -1697,21 +1806,31 @@ After user confirmation, initialize and continue the already submitted batch aut
 
 ## 19.6 Progress dialog
 
-Use shadcn `Dialog`, `Progress`, `Button`, `Badge`, `Separator`, and optional `Collapsible`.
+Use shadcn `Dialog`, `Progress`, `Button`, `Badge`, `Separator`, and `ScrollArea`; use
+`Collapsible` only for secondary details.
 
 Display:
 
 - Title: initialization or extraction.
-- Overall progress label and bar.
+- Overall progress label and monotonic bar.
 - Count: step `m / n` or song `m / n`.
 - Current step or filename.
 - Current progress bar.
-- Stage text.
+- Stage text and one concise current-activity line.
 - Download bytes and speed when relevant.
 - Elapsed time.
+- During initialization, a bounded activity area showing the most recent sanitized messages, with
+  automatic scrolling while the user has not manually scrolled upward.
 - Cancel action.
 
-Do not show a fake percentage for indeterminate work.
+For initialization step 4, keep the activity area visible rather than presenting only a bouncing bar.
+Use clear copy such as “正在下载并安装大型 CUDA 组件，可能需要数分钟” after a short period without
+a more specific update. Do not expose the executable command line, raw traceback, ANSI control
+sequences, credentials, or an unbounded terminal transcript.
+
+Do not show a fake percentage or unstable time-remaining estimate for indeterminate work. Prefer an
+indeterminate current-step bar plus explicit activity and elapsed time. Use determinate progress only
+for measured bytes or reliable completed/total work units.
 
 ## 19.7 Cancellation confirmation
 
@@ -2010,14 +2129,16 @@ Adjust to the scaffold's TypeScript project layout rather than forcing this exac
 - [x] Implement progress dialog using mocked initialization and processing states.
 - [x] Implement completion dialog.
 - [x] Implement error dialog.
-- [ ] Establish spacing, typography, focus states, disabled states, and Windows high-DPI behavior.
+- [ ] Complete final spacing, typography, focus states, disabled states, high-DPI behavior,
+  no-page-scroll layout, and the magenta theme in Phase 16A.
 - [x] Ensure no Chinese text is embedded directly in JSX.
 
 ### Visual direction
 
 - Neutral, restrained desktop utility aesthetic.
-- One clear accent color.
-- Avoid dashboard-like density.
+- One clear Final Cut-inspired magenta accent family; do not retain the scaffold's blue primary
+  treatment.
+- Avoid dashboard-like density and avoid using pink as a large page background.
 - Use large click targets for path selection and the primary action.
 - Avoid excessive animation.
 - Use motion only for dialog transitions and indeterminate progress.
@@ -2481,6 +2602,110 @@ Keep this phase intentionally small.
 
 ---
 
+## Phase 16A — End-to-end inference repair and UX stabilization
+
+This is the next implementation priority. Complete it before the remaining Phase 16 clean-profile
+release validation and before optional Phase 17 work.
+
+### Recovery and reproduction
+
+- [ ] Re-read `AGENTS.md` and this plan, then inspect `git status --short`, recent commits, the current
+  diff, and relevant diagnostics before editing.
+- [ ] Reproduce the current `INFERENCE_FAILED` with one short legal audio fixture and record the exact
+  worker request, failing boundary, stable error, exit code, and bounded stderr in diagnostics.
+- [ ] Confirm whether verbatim path prefixes enter FFprobe, FFmpeg, worker request JSON, Python
+  validation, MSST/SoundFile loading, or more than one boundary. Do not assume the first visible
+  prefix is the only defect.
+
+### Windows path normalization repair
+
+- [ ] Add one narrowly scoped Rust path-boundary helper or type that converts validated canonical
+  paths to external-process paths according to Section 12.
+- [ ] Convert `\\?\UNC\server\share\path` to `\\server\share\path` and `\\?\C:\path` to
+  `C:\path` only after canonical containment/security checks.
+- [ ] Apply the helper consistently to FFprobe, FFmpeg, uv/Python process arguments, worker request
+  JSON, and any downstream library-facing path generated by Rust.
+- [ ] Keep user-facing paths readable and keep canonical/verbatim forms internal to filesystem
+  validation and diagnostics.
+- [ ] Add focused tests for drive paths, UNC paths, already-normal paths, spaces, Simplified Chinese,
+  the regression form `\\?\UNC\snas.local\WD\Media\Record\...`, malformed prefixes, device
+  namespaces, and unsupported long-path cases.
+- [ ] Add or update a stable localized `PATH_UNSUPPORTED` mapping for paths that cannot safely cross a
+  required process boundary.
+- [ ] Run one successful real-model GPU inference from a normal local path.
+- [ ] Run one successful real-model GPU inference from a UNC share when a test share is available;
+  otherwise document the blocked manual test and keep the focused UNC conversion test mandatory.
+
+### Initialization progress and activity UX
+
+- [ ] Add the `runtime://activity` payload and frontend subscription described in Sections 7 and 11.
+- [ ] Capture uv output incrementally with ANSI color disabled, preserve bounded raw diagnostics, and
+  emit only sanitized recognized activity messages to the normal UI.
+- [ ] Show a concise current-activity line and a bounded recent-activity `ScrollArea` during
+  initialization. Keep automatic scrolling unless the user intentionally reviews older entries.
+- [ ] Use reliable byte totals or completed/total unit counts when available. Keep the current-step
+  bar indeterminate when no trustworthy denominator exists.
+- [ ] Keep the stage-weighted overall bar monotonic; do not infer percentage from elapsed time or uv's
+  cosmetic spinner.
+- [ ] Add a reassuring long-operation message for the CUDA/Torch environment sync and keep elapsed
+  time updating even when uv emits no new line.
+- [ ] Add focused reducer/event tests for activity sequencing, stale-task rejection, bounded history,
+  and determinate/indeterminate transitions.
+
+### Final visual theme
+
+- [ ] Replace the blue shadcn/Tailwind primary and progress tokens with the shared magenta palette in
+  Section 19.1.
+- [ ] Use `#FF8AD8` for bright display accents and progress fills, and an accessible darker primary
+  such as `#C12B8F` for filled buttons with white text.
+- [ ] Apply consistent hover, pressed, selected, disabled, and focus-visible states without changing
+  destructive/warning/success semantics.
+- [ ] Verify normal text contrast at 4.5:1 where applicable and control/focus indicators at 3:1.
+- [ ] Confirm there are no accidental blue primary/progress treatments left in the normal MVP UI.
+
+### Main-window fit and visibility
+
+- [ ] Refactor the main page into a full-height layout with page-level overflow hidden.
+- [ ] Keep environment status and initialization/start actions visible in a persistent bottom region.
+- [ ] Keep advanced options collapsed by default and remove unnecessary vertical gaps.
+- [ ] Measure the rendered layout and set the Tauri initial/minimum window size so the normal collapsed
+  page fits at 100%, 125%, and 150% Windows scaling without a page scrollbar.
+- [ ] At 175% and 200%, preserve every control and visible keyboard focus; use a bounded internal
+  scroll region only when the monitor work area cannot contain the whole optional content region.
+- [ ] Verify resizing does not cover the focused control, truncate essential localized text, or move
+  the environment action below an unreachable area.
+
+### Validation and commits
+
+- [ ] Commit the path repair with its focused tests as one independently reviewable unit.
+- [ ] Commit initialization activity/progress improvements with their protocol and frontend tests as
+  one independently reviewable unit.
+- [ ] Commit theme and window-fit polish as one independently reviewable UI unit.
+- [ ] Run frontend lint, typecheck, tests, and build.
+- [ ] Run Rust formatting, clippy, and tests.
+- [ ] Run the locked lightweight worker tests.
+- [ ] Build the raw standalone executable and run a portable smoke test that initializes the runtime
+  if needed and successfully processes one real audio file.
+- [ ] Update this phase, Phase 2, Phase 8, Phase 16, the release checklist, and the Decision Log in the
+  same commits as the verified results they describe.
+
+### Acceptance criteria
+
+- A real audio file completes model inference and publishes a valid accompaniment output instead of
+  returning `INFERENCE_FAILED`.
+- No normal worker request or FFmpeg/FFprobe/Python argument contains a `\\?\` or
+  `\\?\UNC\` prefix; unsupported exceptional paths fail early with a specific localized error.
+- Initialization step 4 visibly communicates current activity and elapsed time. Determinate values
+  are backed by measured bytes or units, and indeterminate work is not represented by a fake percent.
+- The normal collapsed main screen has no page-level scrollbar at 100%, 125%, and 150% scaling, and
+  environment initialization/start actions remain visible.
+- The UI uses the shared magenta theme, retains semantic status colors, and passes the specified
+  contrast and keyboard-focus checks.
+- The standalone executable still builds without required sidecars and completes a real local-path
+  audio-processing smoke test.
+
+---
+
 ## Phase 17 — Release hardening and deferred quality work
 
 This phase is not required to prove the MVP but should be completed before broad public release.
@@ -2931,6 +3156,47 @@ residuals, source-rate output, and output inspection. BtbN targets Windows 10 22
 its two-year monthly-release retention requires repinning before February 2028.
 ```
 
+```text
+2026-08-01 — Normalize canonical Windows paths at process boundaries
+Context: Rust canonicalization can produce verbatim paths such as \\?\UNC\server\share\path, and the
+current real-audio path reaches model inference in that form and fails with INFERENCE_FAILED.
+Decision: Keep canonical/verbatim paths for internal validation, but derive a separate normal drive or
+UNC representation after validation and before process arguments or worker JSON serialization.
+Consequences: Local and UNC path conversions require focused regression tests. Unsupported long or
+device paths fail early with PATH_UNSUPPORTED instead of a generic inference error.
+```
+
+```text
+2026-08-01 — Show structured initialization activity
+Context: The environment-sync step downloads and installs large CUDA components and can remain
+indeterminate for a long time, while a bouncing bar alone does not reassure users that work continues.
+Decision: Keep truthful determinate/indeterminate progress semantics and add a bounded sanitized
+activity feed plus current activity and elapsed time. Raw terminal output remains diagnostic-only.
+Consequences: The backend adds runtime://activity, uv output is captured incrementally with ANSI color
+disabled, and the UI never invents percentages or unstable remaining-time estimates.
+```
+
+```text
+2026-08-01 — Use an accessible Final Cut-inspired magenta theme
+Context: The scaffold's blue controls do not match the intended product identity, while the requested
+HSB 320°, 46%, 100% pink is too light for normal white button text.
+Decision: Use #FF8AD8 as a bright display accent and use a darker magenta such as #C12B8F for filled
+controls with white text. Keep semantic error, warning, and success colors distinct.
+Consequences: Shared theme tokens replace component-local blue styling, and contrast/focus checks are
+part of Phase 16A acceptance.
+```
+
+```text
+2026-08-01 — Keep primary actions visible without normal page scrolling
+Context: The environment status and initialization action can fall below the initial viewport and be
+missed in a simple single-screen utility.
+Decision: Use a measured full-height layout with a persistent bottom action region and no page-level
+scrollbar at normal Windows scaling. Allow a bounded internal fallback only for optional content at
+extreme accessibility scaling when the monitor work area cannot fit everything.
+Consequences: The window minimum size, spacing, localization, and 100%-200% scaling behavior require
+manual verification.
+```
+
 ---
 
 ## 33. Official implementation references
@@ -2962,3 +3228,9 @@ Consult current official documentation before copying setup commands:
 - MSST dependency metadata: https://github.com/ZFTurbo/Music-Source-Separation-Training/blob/main/pyproject.toml
 - Kimberley MSST configuration: https://github.com/ZFTurbo/Music-Source-Separation-Training/blob/main/configs/KimberleyJensen/config_vocals_mel_band_roformer_kj.yaml
 - Kimberley model repository: https://huggingface.co/KimberleyJSN/melbandroformer
+- Windows progress controls: https://learn.microsoft.com/windows/apps/develop/ui/controls/progress-controls
+- Windows maximum path and verbatim-prefix behavior: https://learn.microsoft.com/windows/win32/fileio/maximum-file-path-limitation
+- uv CLI progress and color options: https://docs.astral.sh/uv/reference/cli/
+- WCAG 2.2 contrast requirements: https://www.w3.org/TR/WCAG22/
+- WCAG non-text contrast guidance: https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast
+- WCAG focus appearance guidance: https://www.w3.org/WAI/WCAG22/Understanding/focus-appearance
