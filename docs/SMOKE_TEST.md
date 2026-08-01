@@ -10,6 +10,11 @@ options, result, and diagnostic ID for every failure.
   text appears.
 - Exercise keyboard focus, high-DPI scaling, file/folder selection, output selection, both mode
   cards, advanced options, and validation.
+- At 100%, 150%, and 200% Windows display scaling, verify the native window fits the work area and
+  all main-form and dialog content remains reachable by scrolling.
+- At each scale, use only the keyboard to traverse every control; verify focus remains visible,
+  radio cards and advanced-option checkboxes operate correctly, dialogs trap focus, and disabled
+  actions remain visibly unavailable.
 - Verify English fallback by switching the development locale.
 
 ## First-run runtime
