@@ -1925,12 +1925,12 @@ Do not include authorization headers or download credentials.
 - [x] Create or confirm the repository root.
 - [x] Add `AGENTS.md` and the committed `IMPLEMENTATION_PLAN.md`.
 - [x] Add an MIT `LICENSE` for original project code.
-- [ ] Add an initial `THIRD_PARTY_NOTICES.md` with placeholders for MSST, model, uv, FFmpeg,
+- [x] Add an initial `THIRD_PARTY_NOTICES.md` with exact records for MSST, model, uv, FFmpeg,
   Tauri, and major runtime components.
 - [x] Confirm a working application name and reverse-domain identifier in one central location.
 - [x] Confirm Node.js 22.12 or newer is available.
-- [ ] Confirm Windows Tauri prerequisites are installed: Microsoft C++ build tools and WebView2 development/runtime requirements.
-- [ ] Record actual installed versions in a local development note, not as hard repository pins.
+- [x] Confirm Windows Tauri prerequisites are installed: Microsoft C++ build tools and WebView2 development/runtime requirements.
+- [x] Record actual installed versions in a local development note, not as hard repository pins.
 
 ### Suggested preflight commands
 
@@ -2415,10 +2415,10 @@ Keep this phase intentionally small.
 
 ### Documentation
 
-- [ ] Create `docs/SMOKE_TEST.md`.
-- [ ] Include Windows paths with spaces and Chinese characters.
-- [ ] Include cancellation and output-conflict cases.
-- [ ] Include a manual real-model GPU test.
+- [x] Create `docs/SMOKE_TEST.md`.
+- [x] Include Windows paths with spaces and Chinese characters.
+- [x] Include cancellation and output-conflict cases.
+- [x] Include a manual real-model GPU test.
 
 ### Acceptance criteria
 
@@ -2455,7 +2455,7 @@ Keep this phase intentionally small.
   user-selected output directory.
 - [ ] Start two executable copies concurrently and verify only one initializer mutates shared
   state.
-- [ ] Document portable removal: close the app, delete the executable, and optionally delete
+- [x] Document portable removal: close the app, delete the executable, and optionally delete
   `%LOCALAPPDATA%\soufmer\` to remove the private runtime and settings.
 
 ### Portable release behavior
