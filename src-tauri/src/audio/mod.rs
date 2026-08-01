@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer, de::Error as _};
 use windows_sys::Win32::Storage::FileSystem::ReplaceFileW;
 
 use crate::{
@@ -15,8 +15,7 @@ use crate::{
 
 pub const MODEL_SAMPLE_RATE: u32 = 44_100;
 const SOXR_FILTER: &str = "aresample=resampler=soxr:osr=44100:precision=32";
-const RESIDUAL_FILTER: &str =
-    "[0:a:0][1:a:0]amix=inputs=2:duration=first:dropout_transition=0:weights=1 -1:normalize=0[out]";
+const RESIDUAL_FILTER: &str = "[1:a:0]volume=-1[negative_vocals];[0:a:0][negative_vocals]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[out]";
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct FFprobeDocument {
@@ -33,8 +32,29 @@ pub struct FFprobeStream {
     pub channel_layout: Option<String>,
     pub duration: Option<String>,
     pub sample_fmt: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_u8")]
     pub bits_per_sample: Option<u8>,
+    #[serde(default, deserialize_with = "deserialize_optional_u8")]
     pub bits_per_raw_sample: Option<u8>,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum FFprobeU8 {
+    Number(u8),
+    String(String),
+}
+
+fn deserialize_optional_u8<'de, D>(deserializer: D) -> Result<Option<u8>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match Option::<FFprobeU8>::deserialize(deserializer)? {
+        None => Ok(None),
+        Some(FFprobeU8::Number(value)) => Ok(Some(value)),
+        Some(FFprobeU8::String(value)) if value == "N/A" || value.is_empty() => Ok(None),
+        Some(FFprobeU8::String(value)) => value.parse::<u8>().map(Some).map_err(D::Error::custom),
+    }
 }
 #[derive(Clone, Debug, Deserialize)]
 pub struct FFprobeFormat {
@@ -203,7 +223,7 @@ pub fn source_rate_residual_args(
 ) -> Vec<OsString> {
     let filter = residual_filter(
         &format!(
-            "[1:a:0]aresample=resampler=soxr:osr={}:precision=32[vocals];[0:a:0][vocals]amix=inputs=2:duration=first:dropout_transition=0:weights=1 -1:normalize=0[out]",
+            "[1:a:0]aresample=resampler=soxr:osr={}:precision=32[vocals];[vocals]volume=-1[negative_vocals];[0:a:0][negative_vocals]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[out]",
             source_info.sample_rate
         ),
         format,
@@ -512,10 +532,15 @@ mod tests {
     }
     #[test]
     fn parses_first_audio_stream_and_rejects_three_channels() {
-        let json = r#"{"streams":[{"index":0,"codec_type":"video"},{"index":1,"codec_type":"audio","codec_name":"flac","sample_rate":"48000","channels":2,"duration":"1.5","sample_fmt":"s32"}],"format":{"format_name":"flac"}}"#;
-        assert_eq!(parse_source_info(json).unwrap().stream_index, 1);
+        let json = r#"{"streams":[{"index":0,"codec_type":"video"},{"index":1,"codec_type":"audio","codec_name":"flac","sample_rate":"48000","channels":2,"duration":"1.5","sample_fmt":"s32","bits_per_sample":0,"bits_per_raw_sample":"24"}],"format":{"format_name":"flac"}}"#;
+        let parsed = parse_source_info(json).unwrap();
+        assert_eq!(parsed.stream_index, 1);
+        assert_eq!(parsed.bits_per_sample, Some(0));
+        assert_eq!(parsed.bits_per_raw_sample, Some(24));
         let invalid = json.replace("\"channels\":2", "\"channels\":3");
         assert!(parse_source_info(&invalid).is_err());
+        let invalid_depth = json.replace("\"24\"", "\"not-a-bit-depth\"");
+        assert!(parse_source_info(&invalid_depth).is_err());
     }
     #[test]
     fn model_input_has_exact_soxr_float_vector() {
@@ -546,7 +571,7 @@ mod tests {
         );
     }
     #[test]
-    fn compatibility_filter_keeps_unescaped_negative_weight() {
+    fn compatibility_filter_negates_vocals_before_mixing() {
         let args = strings(compatibility_residual_args(
             Path::new("model.wav"),
             Path::new("vocals.wav"),
@@ -556,8 +581,12 @@ mod tests {
         ));
         assert!(
             args.iter()
-                .any(|value| value.contains("weights=1 -1:normalize=0"))
+                .any(|value| value.contains("[1:a:0]volume=-1[negative_vocals]"))
         );
+        assert!(args.iter().any(|value| value.contains(
+            "[0:a:0][negative_vocals]amix=inputs=2:duration=first:dropout_transition=0:normalize=0"
+        )));
+        assert!(!args.iter().any(|value| value.contains("weights=1 -1")));
         assert!(
             args.iter()
                 .any(|value| value.contains("dither_method=triangular"))
@@ -631,6 +660,11 @@ mod tests {
             args.iter()
                 .any(|value| value.contains("osr=48000:precision=32"))
         );
+        assert!(
+            args.iter()
+                .any(|value| value.contains("[vocals]volume=-1[negative_vocals]"))
+        );
+        assert!(!args.iter().any(|value| value.contains("weights=1 -1")));
         assert!(args.contains(&"-ar".into()));
     }
     #[test]
