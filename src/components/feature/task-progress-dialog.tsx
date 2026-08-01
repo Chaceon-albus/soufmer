@@ -44,7 +44,7 @@ export function TaskProgressDialog({ progress, activities = [], mode, onCancel }
   return <Dialog open>
     <DialogContent aria-describedby="task-progress-description">
       <div className="flex items-start gap-3">
-        <LoaderCircle className="mt-1 size-5 shrink-0 animate-spin text-sky-700" />
+        <LoaderCircle className="mt-1 size-5 shrink-0 animate-spin text-primary" />
         <div className="min-w-0">
           <DialogTitle className="text-lg font-semibold">{t(mode === "initializing" ? "progress.initializingTitle" : mode === "cancelling" ? "progress.cancellingTitle" : "progress.processingTitle")}</DialogTitle>
           <p id="task-progress-description" className="mt-1 text-sm text-slate-600">{count}</p>
@@ -97,7 +97,7 @@ function ActivityFeed({ activities }: { activities: InitializationActivityEntry[
     >
       <ol className="space-y-1.5 p-3" aria-label={t("progress.recentActivity")}>
         {activities.map(({ sequence, activity }) => <li key={sequence} className="flex gap-2 text-xs leading-5 text-slate-600">
-          <span aria-hidden className="mt-2 size-1.5 shrink-0 rounded-full bg-slate-400" />
+          <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-sm bg-display-accent ring-1 ring-primary" />
           <span className="min-w-0 break-words">{formatActivity(activity, t)}</span>
         </li>)}
       </ol>

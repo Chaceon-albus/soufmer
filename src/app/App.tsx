@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { CancellationConfirmationDialog } from "@/components/feature/cancellation-confirmation-dialog";
+import { Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { CompletionDialog } from "@/components/feature/completion-dialog";
 import { EnvironmentStatusCard } from "@/components/feature/environment-status";
@@ -21,6 +22,7 @@ import { acknowledgeInitializationEvents, bufferInitializationEvent, type Buffer
 
 const initializationPlaceholder: InitializationProgress = { runtimeVersion: "", stepIndex: 0, stepCount: 1, stepId: "checkingSystem", overall: { kind: "indeterminate" }, current: { kind: "indeterminate" } };
 const batchPlaceholder: BatchProgress = { itemIndex: 0, itemCount: 1, currentInputPath: "", currentDisplayName: "", stage: "probing", overall: { kind: "indeterminate" }, current: { kind: "indeterminate" }, completedDurationSeconds: 0, totalDurationSeconds: 0, elapsedSeconds: 0 };
+const mainFormId = "main-batch-form";
 
 export default function App() {
   const { t, i18n } = useTranslation();
@@ -87,7 +89,30 @@ export default function App() {
   const persistSettings = useCallback((settings: import("@/types/domain").AppSettings) => { dispatch({ type: "settingsUpdated", settings }); queueSettingsSave(settings); }, [queueSettingsSave]);
   const switchLanguage = useCallback(() => { const locale = i18n.language === "zh-CN" ? "en" : "zh-CN"; void i18n.changeLanguage(locale); if (state.type !== "booting" && state.settings) persistSettings({ ...state.settings, locale }); }, [i18n, persistSettings, state]);
 
-  return <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900 sm:px-6"><div className="mx-auto max-w-3xl"><header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h1 className="text-2xl font-semibold tracking-tight">Soufmer</h1><p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">{t("app.description")}</p></div><div className="flex flex-wrap gap-1"><Button type="button" variant="ghost" size="sm" onClick={() => setLicenseOpen(true)}>{t("license.open")}</Button><Button type="button" variant="ghost" size="sm" onClick={switchLanguage}>{t("app.switchLanguage")}</Button></div></header>{idle && <><Card><CardContent><MainForm settings={idle.settings} onSubmit={(request: StartBatchRequest) => dispatch({ type: "startRequested", request })} onSettingsChange={persistSettings} onChooseInput={chooseInput} onChooseOutput={chooseOutputDirectory} submitDisabled={!listenersReady} /></CardContent></Card><div className="mt-5"><EnvironmentStatusCard status={idle.environment} onInitialize={requestInitialization} disabled={!listenersReady} /></div></>}{import.meta.env.DEV && !isDesktopBridge() && <div className="mt-5 space-y-2"><p className="text-center text-xs text-slate-500">{t("development.browserFallback")}</p><div className="flex flex-wrap justify-center gap-2"><Button type="button" size="sm" variant="outline" onClick={() => dispatch({ type: "developmentCompleted", result: { taskId: "browser-cancelled", succeeded: 0, failed: 0, skipped: 0, outputDirectory: "", cancelled: true, items: [] } })}>{t("development.previewCancelled")}</Button><Button type="button" size="sm" variant="outline" onClick={() => dispatch({ type: "failed", error: { code: "ENV_NOT_INITIALIZED", stage: "runtime", messageKey: "error.environmentNotInitialized", recoverable: true, diagnosticId: "browser-preview" } })}>{t("development.previewError")}</Button></div></div>}</div>{licenseOpen && <LicenseDialog onClose={() => setLicenseOpen(false)} />}{state.type === "awaitingInitializationConsent" && <InitializationConsent environment={state.environment} onAccept={beginInitialization} onDecline={dismiss} />}{cancellationConfirmation && <CancellationConfirmationDialog mode={cancellationConfirmation.mode} onConfirm={confirmCancellation} onDecline={declineCancellation} />}{state.type === "initializing" && <TaskProgressDialog progress={state.progress} activities={state.activities} mode="initializing" onCancel={requestCancellation} />}{state.type === "processing" && <TaskProgressDialog progress={state.progress} mode="processing" onCancel={requestCancellation} />}{state.type === "cancelling" && state.lastProgress && <TaskProgressDialog progress={state.lastProgress} activities={state.initializationActivities} mode="cancelling" onCancel={() => undefined} />}{state.type === "completed" && <CompletionDialog result={state.result} onDone={dismiss} onOpenOutput={() => void revealOutputDirectory(state.result.outputDirectory)} />}{state.type === "failed" && <ErrorDialog error={state.error} onClose={dismiss} onRetryInitialization={state.error.recoverable && state.initializationRequest ? retryInitialization : undefined} />}</main>;
+  return <main className="h-dvh overflow-hidden bg-slate-50 text-slate-900">
+    <div className="mx-auto grid h-full max-w-4xl grid-rows-[auto_minmax(0,1fr)_auto] px-4 py-4 sm:px-6">
+      <header className="flex items-start justify-between gap-4 border-b border-slate-200 pb-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-3"><span aria-hidden className="h-6 w-1 rounded-sm bg-display-accent ring-1 ring-primary" /><h1 className="text-2xl font-semibold">Soufmer</h1></div>
+          <p className="mt-1 max-w-xl text-sm leading-5 text-slate-600">{t("app.description")}</p>
+        </div>
+        <div className="flex shrink-0 flex-wrap justify-end gap-1"><Button type="button" variant="ghost" size="sm" onClick={() => setLicenseOpen(true)}>{t("license.open")}</Button><Button type="button" variant="ghost" size="sm" onClick={switchLanguage}>{t("app.switchLanguage")}</Button></div>
+      </header>
+      <section className="min-h-0 overflow-y-auto py-3 pr-1">
+        {idle && <Card><CardContent className="p-4"><MainForm formId={mainFormId} settings={idle.settings} onSubmit={(request: StartBatchRequest) => dispatch({ type: "startRequested", request })} onSettingsChange={persistSettings} onChooseInput={chooseInput} onChooseOutput={chooseOutputDirectory} submitDisabled={!listenersReady || idle.environment.type !== "ready"} /></CardContent></Card>}
+        {import.meta.env.DEV && !isDesktopBridge() && <div className="mt-3 space-y-2"><p className="text-center text-xs text-slate-500">{t("development.browserFallback")}</p><div className="flex flex-wrap justify-center gap-2"><Button type="button" size="sm" variant="outline" onClick={() => dispatch({ type: "developmentCompleted", result: { taskId: "browser-cancelled", succeeded: 0, failed: 0, skipped: 0, outputDirectory: "", cancelled: true, items: [] } })}>{t("development.previewCancelled")}</Button><Button type="button" size="sm" variant="outline" onClick={() => dispatch({ type: "failed", error: { code: "ENV_NOT_INITIALIZED", stage: "runtime", messageKey: "error.environmentNotInitialized", recoverable: true, diagnosticId: "browser-preview" } })}>{t("development.previewError")}</Button></div></div>}
+      </section>
+      {idle && <footer className="border-t border-slate-200 pt-3"><div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"><EnvironmentStatusCard status={idle.environment} onInitialize={requestInitialization} disabled={!listenersReady} /><Button type="submit" form={mainFormId} size="lg" className="w-full sm:min-w-44 sm:w-auto" disabled={!listenersReady || idle.environment.type !== "ready"}><Sparkles className="size-4" />{t("main.start")}</Button></div></footer>}
+    </div>
+    {licenseOpen && <LicenseDialog onClose={() => setLicenseOpen(false)} />}
+    {state.type === "awaitingInitializationConsent" && <InitializationConsent environment={state.environment} onAccept={beginInitialization} onDecline={dismiss} />}
+    {cancellationConfirmation && <CancellationConfirmationDialog mode={cancellationConfirmation.mode} onConfirm={confirmCancellation} onDecline={declineCancellation} />}
+    {state.type === "initializing" && <TaskProgressDialog progress={state.progress} activities={state.activities} mode="initializing" onCancel={requestCancellation} />}
+    {state.type === "processing" && <TaskProgressDialog progress={state.progress} mode="processing" onCancel={requestCancellation} />}
+    {state.type === "cancelling" && state.lastProgress && <TaskProgressDialog progress={state.lastProgress} activities={state.initializationActivities} mode="cancelling" onCancel={() => undefined} />}
+    {state.type === "completed" && <CompletionDialog result={state.result} onDone={dismiss} onOpenOutput={() => void revealOutputDirectory(state.result.outputDirectory)} />}
+    {state.type === "failed" && <ErrorDialog error={state.error} onClose={dismiss} onRetryInitialization={state.error.recoverable && state.initializationRequest ? retryInitialization : undefined} />}
+  </main>;
 }
 
 function InitializationConsent({ environment, onAccept, onDecline }: { environment: EnvironmentStatus; onAccept: () => void; onDecline: () => void }) {

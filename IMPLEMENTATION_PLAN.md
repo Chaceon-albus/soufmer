@@ -1,7 +1,7 @@
 # Accompaniment Extractor — Detailed Implementation Plan
 
 Status: Implementation substantially complete; end-to-end stabilization and portable validation in progress
-Last reviewed: 2026-08-01
+Last reviewed: 2026-08-02
 Target platform: Windows 10/11 x64
 Default UI locale: Simplified Chinese (`zh-CN`)
 Development language: English
@@ -31,19 +31,19 @@ This checkpoint is based on the committed checklist and the project owner's manu
 is not a substitute for inspecting the current Git worktree, recent commits, diagnostics, and test
 results at the start of the next agent run.
 
-- Phases 0 through 15 are implemented according to the checklist, except for the final visual/high-DPI
-  polish item in Phase 2 and the real-model GPU inference smoke test in Phase 8.
+- Phases 0 through 15 are implemented according to the checklist, including the Phase 2
+  visual/high-DPI polish and the Phase 8 real-model GPU inference smoke test.
 - The raw standalone executable builds and starts, and first-run private runtime initialization has
   succeeded on the current development machine.
 - Most Phase 16 packaging work is complete, including the one-file artifact, but clean-profile,
   prerequisite, concurrency, and write-boundary validation remain open.
-- The MVP is not yet end-to-end complete because real audio processing currently fails with
-  `INFERENCE_FAILED`. Canonicalized Windows paths are reaching external-process and worker boundaries
-  with verbatim prefixes such as `\\?\UNC\server\share\...`.
-- Initialization step 4 (`uv sync`) can remain visually indeterminate for a long time without useful
-  activity detail, and the main-window layout and color system still need final UX polish.
-- Phase 16A is the next priority. Complete it before treating Phase 16 acceptance criteria as passed
-  or beginning optional Phase 17 release hardening.
+- The Windows process-boundary repair now passes a real local-path CUDA production-pipeline smoke
+  test and publishes a valid accompaniment output. The real UNC smoke remains blocked because the
+  available `\\snas.local\WD\Media\Record` share is inaccessible from the development machine.
+- Initialization now exposes bounded sanitized activity during long indeterminate work, and the
+  normal main screen uses the measured no-page-scroll layout and shared magenta theme.
+- Phase 16A integration quality gates and portable executable smoke remain the next priority. Do not
+  treat Phase 16 acceptance criteria as passed or begin optional Phase 17 release hardening first.
 
 ---
 
@@ -2129,7 +2129,7 @@ Adjust to the scaffold's TypeScript project layout rather than forcing this exac
 - [x] Implement progress dialog using mocked initialization and processing states.
 - [x] Implement completion dialog.
 - [x] Implement error dialog.
-- [ ] Complete final spacing, typography, focus states, disabled states, high-DPI behavior,
+- [x] Complete final spacing, typography, focus states, disabled states, high-DPI behavior,
   no-page-scroll layout, and the magenta theme in Phase 16A.
 - [x] Ensure no Chinese text is embedded directly in JSX.
 
@@ -2654,25 +2654,25 @@ release validation and before optional Phase 17 work.
 
 ### Final visual theme
 
-- [ ] Replace the blue shadcn/Tailwind primary and progress tokens with the shared magenta palette in
+- [x] Replace the blue shadcn/Tailwind primary and progress tokens with the shared magenta palette in
   Section 19.1.
-- [ ] Use `#FF8AD8` for bright display accents and progress fills, and an accessible darker primary
+- [x] Use `#FF8AD8` for bright display accents and progress fills, and an accessible darker primary
   such as `#C12B8F` for filled buttons with white text.
-- [ ] Apply consistent hover, pressed, selected, disabled, and focus-visible states without changing
+- [x] Apply consistent hover, pressed, selected, disabled, and focus-visible states without changing
   destructive/warning/success semantics.
-- [ ] Verify normal text contrast at 4.5:1 where applicable and control/focus indicators at 3:1.
-- [ ] Confirm there are no accidental blue primary/progress treatments left in the normal MVP UI.
+- [x] Verify normal text contrast at 4.5:1 where applicable and control/focus indicators at 3:1.
+- [x] Confirm there are no accidental blue primary/progress treatments left in the normal MVP UI.
 
 ### Main-window fit and visibility
 
-- [ ] Refactor the main page into a full-height layout with page-level overflow hidden.
-- [ ] Keep environment status and initialization/start actions visible in a persistent bottom region.
-- [ ] Keep advanced options collapsed by default and remove unnecessary vertical gaps.
-- [ ] Measure the rendered layout and set the Tauri initial/minimum window size so the normal collapsed
+- [x] Refactor the main page into a full-height layout with page-level overflow hidden.
+- [x] Keep environment status and initialization/start actions visible in a persistent bottom region.
+- [x] Keep advanced options collapsed by default and remove unnecessary vertical gaps.
+- [x] Measure the rendered layout and set the Tauri initial/minimum window size so the normal collapsed
   page fits at 100%, 125%, and 150% Windows scaling without a page scrollbar.
-- [ ] At 175% and 200%, preserve every control and visible keyboard focus; use a bounded internal
+- [x] At 175% and 200%, preserve every control and visible keyboard focus; use a bounded internal
   scroll region only when the monitor work area cannot contain the whole optional content region.
-- [ ] Verify resizing does not cover the focused control, truncate essential localized text, or move
+- [x] Verify resizing does not cover the focused control, truncate essential localized text, or move
   the environment action below an unreachable area.
 
 ### Validation and commits
@@ -2680,7 +2680,7 @@ release validation and before optional Phase 17 work.
 - [x] Commit the path repair with its focused tests as one independently reviewable unit.
 - [x] Commit initialization activity/progress improvements with their protocol and frontend tests as
   one independently reviewable unit.
-- [ ] Commit theme and window-fit polish as one independently reviewable UI unit.
+- [x] Commit theme and window-fit polish as one independently reviewable UI unit.
 - [ ] Run frontend lint, typecheck, tests, and build.
 - [ ] Run Rust formatting, clippy, and tests.
 - [ ] Run the locked lightweight worker tests.
@@ -3193,8 +3193,9 @@ missed in a simple single-screen utility.
 Decision: Use a measured full-height layout with a persistent bottom action region and no page-level
 scrollbar at normal Windows scaling. Allow a bounded internal fallback only for optional content at
 extreme accessibility scaling when the monitor work area cannot fit everything.
-Consequences: The window minimum size, spacing, localization, and 100%-200% scaling behavior require
-manual verification.
+Consequences: The initial client size is 820 x 740 and the measured minimum is 760 x 720. Production
+renders at 100%, 125%, 150%, 175%, and 200% keep the collapsed form and persistent actions visible;
+a constrained 760 x 540 render scrolls only the middle form region.
 ```
 
 ---

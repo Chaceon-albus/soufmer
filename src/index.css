@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
-@theme { --font-sans: "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif; }
+@theme {
+  --font-sans: "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  --color-primary: #c12b8f;
+  --color-primary-hover: #a61e73;
+  --color-primary-active: #8f185f;
+  --color-display-accent: #ff8ad8;
+  --color-focus: #c12b8f;
+  --color-selected: #fff0fa;
+}
 @keyframes progress { 0%, 100% { transform: translateX(-100%); } 50% { transform: translateX(300%); } }
-@layer base { * { box-sizing: border-box; } body { margin: 0; min-width: 320px; min-height: 100vh; } button, input, select { font: inherit; } }
+@layer base {
+  * { box-sizing: border-box; }
+  html, body, #root { height: 100%; overflow: hidden; }
+  body { margin: 0; min-width: 320px; }
+  button, input, select { font: inherit; }
+}
