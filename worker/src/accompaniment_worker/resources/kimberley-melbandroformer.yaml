@@ -1,0 +1,7 @@
+# This lightweight record reports whether a standalone development self-test was
+# given the installed runtime artifacts. The audited architecture configuration is
+# the separate vendored MSST YAML and is validated by SHA-256 before model import.
+schemaVersion: 1
+modelId: KimberleyJSN/melbandroformer
+status: NOT_CONFIGURED
+inferenceAvailable: false

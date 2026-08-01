@@ -2150,21 +2150,21 @@ This phase proves the complete GUI lifecycle before downloads and model work beg
 
 ### Tasks
 
-- [ ] Create `worker/pyproject.toml`.
-- [ ] Set `.python-version` to `3.11`, not an exact patch.
-- [ ] Select a known-good exact MSST commit for the dependency/import audit and record the full SHA.
-- [ ] Audit the pinned MSST Mel-Band RoFormer import closure and declare all worker runtime
+- [x] Create `worker/pyproject.toml`.
+- [x] Set `.python-version` to `3.11`, not an exact patch.
+- [x] Select a known-good exact MSST commit for the dependency/import audit and record the full SHA.
+- [x] Audit the pinned MSST Mel-Band RoFormer import closure and declare all worker runtime
   dependencies, including `einops`, `beartype`, and `rotary-embedding-torch`.
-- [ ] Define version-matched Torch and torchaudio in a `cuda` extra mapped to one fixed, explicit
+- [x] Define version-matched Torch and torchaudio in a `cuda` extra mapped to one fixed, explicit
   PyTorch CUDA index through `tool.uv.sources`.
 - [ ] Verify from a clean environment that no `uv pip install --reinstall`, `uv add`, or
   `--no-sync` repair step is needed.
-- [ ] Generate and commit `uv.lock`.
+- [x] Generate and commit `uv.lock`.
 - [ ] Add a build backend and verify a non-editable install contains the worker package.
-- [ ] Add the worker package and CLI.
-- [ ] Add request validation.
-- [ ] Add JSON Lines protocol utilities.
-- [ ] Add worker self-test.
+- [x] Add the worker package and CLI.
+- [x] Add request validation.
+- [x] Add JSON Lines protocol utilities.
+- [x] Add worker self-test.
 - [ ] Add the worker project and vendored MSST tree to the deterministic embedded bootstrap inputs.
 - [ ] Add a release check that rejects Git/VCS MSST dependencies and absolute local paths in
   `uv.lock`.
@@ -2172,7 +2172,7 @@ This phase proves the complete GUI lifecycle before downloads and model work beg
 - [ ] Implement `uv python install 3.11`.
 - [ ] Implement the production sync command from Section 17 with `--locked`, `--no-dev`,
   `--extra cuda`, `--no-editable`, `--managed-python`, and `--no-python-downloads`.
-- [ ] Add core Python protocol tests only.
+- [x] Add core Python protocol tests only.
 
 ### Notes
 
@@ -2209,14 +2209,14 @@ This phase proves the complete GUI lifecycle before downloads and model work beg
   configuration resources.
 - [ ] Re-run the clean dependency audit and regenerate `uv.lock` if the copied import closure
   differs from the Phase 7 audit.
-- [ ] Add a repeatable vendor drift/patch check.
-- [ ] Implement single-file inference wrapper.
-- [ ] Remove or bypass folder scanning.
-- [ ] Disable uncontrolled tqdm output on stdout.
-- [ ] Emit chunk or batch progress through the worker protocol.
-- [ ] Map CUDA OOM and common import/checkpoint failures to stable codes.
-- [ ] Load the hash-verified checkpoint with `weights_only=True` and validate its state dict.
-- [ ] Confirm output vocals file is 44.1 kHz stereo Float32.
+- [x] Add a repeatable vendor drift/patch check.
+- [x] Implement single-file inference wrapper.
+- [x] Remove or bypass folder scanning.
+- [x] Disable uncontrolled tqdm output on stdout.
+- [x] Emit chunk or batch progress through the worker protocol.
+- [x] Map CUDA OOM and common import/checkpoint failures to stable codes.
+- [x] Load the hash-verified checkpoint with `weights_only=True` and validate its state dict.
+- [x] Confirm output vocals file is 44.1 kHz stereo Float32.
 - [ ] Run one manual GPU inference against a short, legally usable test clip.
 
 ### Acceptance criteria
@@ -2393,11 +2393,11 @@ Keep this phase intentionally small.
 
 ### Python tests
 
-- [ ] Request validation.
-- [ ] JSON Lines serialization.
-- [ ] Worker configuration loading without loading the model.
-- [ ] Vendored MSST import-closure and patch-drift check.
-- [ ] Error-code mapping without loading the full model.
+- [x] Request validation.
+- [x] JSON Lines serialization.
+- [x] Worker configuration loading without loading the model.
+- [x] Vendored MSST import-closure and patch-drift check.
+- [x] Error-code mapping without loading the full model.
 
 ### Frontend tests
 
@@ -2770,10 +2770,10 @@ Before producing a public build:
 - [ ] Pin model Hugging Face revision.
 - [ ] Archive the model card/license state from that exact revision.
 - [ ] Calculate model SHA-256.
-- [ ] Pin MSST commit.
-- [ ] Verify vendored file hashes, upstream MIT text, and ordered patch set.
-- [ ] Select and record the fixed PyTorch CUDA index plus matching Torch/torchaudio versions.
-- [ ] Regenerate `uv.lock` after dependency decisions.
+- [x] Pin MSST commit.
+- [x] Verify vendored file hashes, upstream MIT text, and ordered patch set.
+- [x] Select and record the fixed PyTorch CUDA index plus matching Torch/torchaudio versions.
+- [x] Regenerate `uv.lock` after dependency decisions.
 - [ ] Perform a clean locked CUDA sync and confirm a second sync changes nothing.
 - [ ] Confirm the self-test reports the expected CUDA build suffix and runs a tiny CUDA operation.
 - [ ] Run worker self-test from a clean `%LOCALAPPDATA%\soufmer\` runtime.
