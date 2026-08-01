@@ -5,6 +5,7 @@ pub const EVENT_SCHEMA_VERSION: u8 = 1;
 #[derive(Clone, Copy, Debug)]
 pub enum EventName {
     RuntimeProgress,
+    RuntimeActivity,
     RuntimeCompleted,
     BatchProgress,
     BatchItemCompleted,
@@ -17,6 +18,7 @@ impl EventName {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::RuntimeProgress => "runtime://progress",
+            Self::RuntimeActivity => "runtime://activity",
             Self::RuntimeCompleted => "runtime://completed",
             Self::BatchProgress => "batch://progress",
             Self::BatchItemCompleted => "batch://item-completed",

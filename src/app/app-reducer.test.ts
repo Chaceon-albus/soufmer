@@ -40,7 +40,7 @@ describe("appReducer", () => {
       current: { kind: "indeterminate" as const },
     };
     const readyEnvironment = { type: "ready" as const, runtimeVersion: "1.0.0", modelVersion: "model", ffmpegVersion: "ffmpeg" };
-    const initializing: AppState = { type: "initializing", taskId: "runtime-1", request, environment: { type: "notInstalled" }, settings: defaultSettings, progress: initializationProgress, lastSequence: 1 };
+    const initializing: AppState = { type: "initializing", taskId: "runtime-1", request, environment: { type: "notInstalled" }, settings: defaultSettings, progress: initializationProgress, activities: [], lastSequence: 1 };
 
     expect(appReducer(initializing, { type: "initializationCompleted", taskId: "runtime-1", sequence: 2, environment: readyEnvironment })).toMatchObject({
       type: "validating",
@@ -94,6 +94,39 @@ describe("appReducer", () => {
     };
 
     expect(appReducer(state, { type: "initializationRetryRequested" })).toBe(state);
+  });
+  it("orders and bounds initialization activity while preserving truthful progress", () => {
+    const initializationProgress = {
+      runtimeVersion: "1.0.0",
+      stepIndex: 4,
+      stepCount: 7,
+      stepId: "syncingEnvironment",
+      overall: { kind: "determinate" as const, fraction: 0.15 },
+      current: { kind: "indeterminate" as const },
+    };
+    const activity = { stepId: "syncingEnvironment", level: "download" as const, message: "downloadingPackage", packageName: "torch" };
+    let state: AppState = { type: "initializing", taskId: "runtime-1", request, environment: { type: "notInstalled" }, settings: defaultSettings, progress: initializationProgress, activities: [], lastSequence: 1 };
+
+    expect(appReducer(state, { type: "initializationActivity", taskId: "other-task", sequence: 2, activity })).toBe(state);
+    state = appReducer(state, { type: "initializationActivity", taskId: "runtime-1", sequence: 2, activity });
+    expect(state).toMatchObject({ type: "initializing", lastSequence: 2, activities: [{ sequence: 2 }] });
+    expect(appReducer(state, { type: "initializationProgress", taskId: "runtime-1", sequence: 2, progress: initializationProgress })).toBe(state);
+
+    state = appReducer(state, {
+      type: "initializationProgress",
+      taskId: "runtime-1",
+      sequence: 3,
+      progress: { ...initializationProgress, overall: { kind: "determinate", fraction: 0.10 }, current: { kind: "determinate", fraction: 1 } },
+    });
+    expect(state).toMatchObject({ progress: { overall: { fraction: 0.15 }, current: { kind: "determinate", fraction: 1 } } });
+
+    for (let sequence = 4; sequence <= 18; sequence += 1) {
+      state = appReducer(state, { type: "initializationActivity", taskId: "runtime-1", sequence, activity: { ...activity, packageName: `package-${sequence}` } });
+    }
+    expect(state).toMatchObject({ type: "initializing", lastSequence: 18 });
+    if (state.type !== "initializing") throw new Error("expected initializing state");
+    expect(state.activities).toHaveLength(12);
+    expect(state.activities[0].sequence).toBe(7);
   });
   it("returns initialization cancellation to idle and only fabricates a batch result as a fallback", () => {
     const initializationProgress = {

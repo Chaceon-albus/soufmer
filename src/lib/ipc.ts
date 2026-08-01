@@ -8,7 +8,7 @@ import type { LicenseNotice } from "@/types/backend";
 import type { AppError, AppSettings, BatchResult, EnvironmentStatus, StartBatchRequest } from "@/types/domain";
 import { defaultSettings, mockEnvironment } from "@/app/app-state";
 
-export const eventNames = ["runtime://progress", "runtime://completed", "batch://progress", "batch://item-completed", "batch://completed", "task://failed", "task://cancelled"] as const;
+export const eventNames = ["runtime://progress", "runtime://activity", "runtime://completed", "batch://progress", "batch://item-completed", "batch://completed", "task://failed", "task://cancelled"] as const;
 export const supportedAudioExtensions = ["wav", "flac", "mp3", "m4a", "aac", "ogg", "opus", "aiff", "aif", "wma"] as const;
 export type BackendEventName = (typeof eventNames)[number];
 export const isDesktopBridge = () => isTauri();

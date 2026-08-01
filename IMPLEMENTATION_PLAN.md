@@ -2638,18 +2638,18 @@ release validation and before optional Phase 17 work.
 
 ### Initialization progress and activity UX
 
-- [ ] Add the `runtime://activity` payload and frontend subscription described in Sections 7 and 11.
-- [ ] Capture uv output incrementally with ANSI color disabled, preserve bounded raw diagnostics, and
+- [x] Add the `runtime://activity` payload and frontend subscription described in Sections 7 and 11.
+- [x] Capture uv output incrementally with ANSI color disabled, preserve bounded raw diagnostics, and
   emit only sanitized recognized activity messages to the normal UI.
-- [ ] Show a concise current-activity line and a bounded recent-activity `ScrollArea` during
+- [x] Show a concise current-activity line and a bounded recent-activity `ScrollArea` during
   initialization. Keep automatic scrolling unless the user intentionally reviews older entries.
-- [ ] Use reliable byte totals or completed/total unit counts when available. Keep the current-step
+- [x] Use reliable byte totals or completed/total unit counts when available. Keep the current-step
   bar indeterminate when no trustworthy denominator exists.
-- [ ] Keep the stage-weighted overall bar monotonic; do not infer percentage from elapsed time or uv's
+- [x] Keep the stage-weighted overall bar monotonic; do not infer percentage from elapsed time or uv's
   cosmetic spinner.
-- [ ] Add a reassuring long-operation message for the CUDA/Torch environment sync and keep elapsed
+- [x] Add a reassuring long-operation message for the CUDA/Torch environment sync and keep elapsed
   time updating even when uv emits no new line.
-- [ ] Add focused reducer/event tests for activity sequencing, stale-task rejection, bounded history,
+- [x] Add focused reducer/event tests for activity sequencing, stale-task rejection, bounded history,
   and determinate/indeterminate transitions.
 
 ### Final visual theme
@@ -2678,7 +2678,7 @@ release validation and before optional Phase 17 work.
 ### Validation and commits
 
 - [x] Commit the path repair with its focused tests as one independently reviewable unit.
-- [ ] Commit initialization activity/progress improvements with their protocol and frontend tests as
+- [x] Commit initialization activity/progress improvements with their protocol and frontend tests as
   one independently reviewable unit.
 - [ ] Commit theme and window-fit polish as one independently reviewable UI unit.
 - [ ] Run frontend lint, typecheck, tests, and build.

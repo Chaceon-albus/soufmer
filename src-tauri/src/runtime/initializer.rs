@@ -20,7 +20,10 @@ use windows_sys::Win32::{
 use zip::ZipArchive;
 
 use crate::{
-    domain::{AppError, ErrorCode, InitializationStep, ProgressValue},
+    domain::{
+        AppError, ErrorCode, InitializationActivity, InitializationActivityLevel,
+        InitializationStep, ProgressValue,
+    },
     download::{
         DownloadProgress, DownloadRequest, Downloader, ZipExtractionLimits, extract_zip_safely,
     },
@@ -50,6 +53,12 @@ pub struct InitUpdate {
     pub bytes: Option<(u64, Option<u64>, u64)>,
     pub detail: &'static str,
 }
+#[derive(Clone, Debug)]
+pub enum InitEvent {
+    Progress(InitUpdate),
+    Activity(InitializationActivity),
+}
+pub type InitEventSink = Arc<dyn Fn(InitEvent) + Send + Sync>;
 #[derive(Clone, Debug)]
 pub struct ActiveRuntime {
     pub ffmpeg: PathBuf,
@@ -168,15 +177,20 @@ pub fn resolve_active_runtime(paths: &AppPaths) -> Result<ActiveRuntime, AppErro
 pub fn initialize(
     paths: &AppPaths,
     cancellation: &CancellationToken,
-    emit: &mut impl FnMut(InitUpdate),
+    emit: InitEventSink,
 ) -> Result<(), AppError> {
     let _mutex = RuntimeMutex::acquire(cancellation)?;
     ensure_root(paths)?;
-    emit(update(
-        InitializationStep::CheckingSystem,
-        0.02,
-        "validating private runtime state",
-    ));
+    emit_progress(
+        &emit,
+        InitUpdate {
+            step: InitializationStep::CheckingSystem,
+            current: ProgressValue::Indeterminate,
+            fraction: 0.0,
+            bytes: None,
+            detail: "validating private runtime state",
+        },
+    );
     if cancellation.is_cancelled() {
         return Err(cancelled());
     }
@@ -187,13 +201,32 @@ pub fn initialize(
     )?;
     ensure_free_space(paths.root(), manifest.estimates.minimum_free_bytes)?;
     if let Ok(crate::domain::EnvironmentStatus::Ready { .. }) = environment_status(paths) {
+        emit_progress(
+            &emit,
+            update(
+                InitializationStep::CheckingSystem,
+                0.02,
+                "validated private runtime state",
+            ),
+        );
         return Ok(());
     }
-    emit(update(
-        InitializationStep::PreparingTools,
-        0.05,
-        "validated embedded bootstrap",
-    ));
+    emit_progress(
+        &emit,
+        update(
+            InitializationStep::CheckingSystem,
+            0.02,
+            "validated private runtime state",
+        ),
+    );
+    emit_progress(
+        &emit,
+        update(
+            InitializationStep::PreparingTools,
+            0.02,
+            "validated embedded bootstrap",
+        ),
+    );
     let runtime_id = format!(
         "runtime-{}-cuda-{}-{}",
         manifest.bootstrap_version,
@@ -205,7 +238,7 @@ pub fn initialize(
         return Err(invalid("inactive runtime version already exists"));
     }
     fs::create_dir_all(&runtime).map_err(runtime_error)?;
-    let result = install_runtime(paths, &bootstrap, &runtime, &manifest, cancellation, emit);
+    let result = install_runtime(paths, &bootstrap, &runtime, &manifest, cancellation, &emit);
     if result.is_err() {
         let _ = fs::remove_dir_all(&runtime);
         return result;
@@ -220,11 +253,14 @@ pub fn initialize(
             activated_at: now(),
         },
     )?;
-    emit(update(
-        InitializationStep::Activating,
-        1.0,
-        "activated validated runtime",
-    ));
+    emit_progress(
+        &emit,
+        update(
+            InitializationStep::Activating,
+            1.0,
+            "activated validated runtime",
+        ),
+    );
     Ok(())
 }
 
@@ -234,40 +270,74 @@ fn install_runtime(
     runtime: &Path,
     manifest: &RuntimeManifest,
     cancellation: &CancellationToken,
-    emit: &mut impl FnMut(InitUpdate),
+    emit: &InitEventSink,
 ) -> Result<(), AppError> {
     copy_tree(&bootstrap.join("worker"), &runtime.join("worker"))?;
     let uv = bootstrap.join("bin/uv.exe");
     let environment = private_environment(paths, runtime)?;
-    emit(update(
+    install_ffmpeg(paths, runtime, manifest, cancellation, emit)?;
+    emit_activity(
+        emit,
         InitializationStep::InstallingPython,
-        0.15,
-        "installing managed Python",
-    ));
+        InitializationActivityLevel::Status,
+        "installingPython",
+        None,
+    );
+    emit_progress(
+        emit,
+        InitUpdate {
+            step: InitializationStep::InstallingPython,
+            current: ProgressValue::Indeterminate,
+            fraction: 0.05,
+            bytes: None,
+            detail: "installing managed Python",
+        },
+    );
     run(
         &uv,
-        &["python", "install", "3.11"],
+        &["--color", "never", "python", "install", "3.11"],
         runtime,
         &environment,
         cancellation,
         ErrorCode::PythonSyncFailed,
+        Some((InitializationStep::InstallingPython, Arc::clone(emit))),
     )?;
+    emit_progress(
+        emit,
+        update(
+            InitializationStep::InstallingPython,
+            0.15,
+            "installed managed Python",
+        ),
+    );
     if cancellation.is_cancelled() {
         return Err(cancelled());
     }
-    emit(InitUpdate {
-        step: InitializationStep::SyncingEnvironment,
-        current: ProgressValue::Indeterminate,
-        fraction: 0.60,
-        bytes: None,
-        detail: "synchronizing locked CUDA environment",
-    });
-    let args = manifest
-        .worker
-        .production_sync_arguments
-        .iter()
-        .map(String::as_str)
-        .collect::<Vec<_>>();
+    emit_activity(
+        emit,
+        InitializationStep::SyncingEnvironment,
+        InitializationActivityLevel::Status,
+        "syncingCudaEnvironment",
+        None,
+    );
+    emit_progress(
+        emit,
+        InitUpdate {
+            step: InitializationStep::SyncingEnvironment,
+            current: ProgressValue::Indeterminate,
+            fraction: 0.15,
+            bytes: None,
+            detail: "synchronizing locked CUDA environment",
+        },
+    );
+    let mut args = vec!["--color", "never"];
+    args.extend(
+        manifest
+            .worker
+            .production_sync_arguments
+            .iter()
+            .map(String::as_str),
+    );
     run(
         &uv,
         &args,
@@ -275,14 +345,34 @@ fn install_runtime(
         &environment,
         cancellation,
         ErrorCode::PythonSyncFailed,
+        Some((InitializationStep::SyncingEnvironment, Arc::clone(emit))),
     )?;
-    install_ffmpeg(paths, runtime, manifest, cancellation, emit)?;
+    emit_progress(
+        emit,
+        update(
+            InitializationStep::SyncingEnvironment,
+            0.60,
+            "synchronized locked CUDA environment",
+        ),
+    );
     install_model(paths, manifest, cancellation, emit)?;
-    emit(update(
+    emit_activity(
+        emit,
         InitializationStep::SelfTesting,
-        0.99,
-        "running private worker self-test",
-    ));
+        InitializationActivityLevel::Status,
+        "selfTesting",
+        None,
+    );
+    emit_progress(
+        emit,
+        InitUpdate {
+            step: InitializationStep::SelfTesting,
+            current: ProgressValue::Indeterminate,
+            fraction: 0.95,
+            bytes: None,
+            detail: "running private worker self-test",
+        },
+    );
     let python = runtime.join("venv/Scripts/python.exe");
     let model = model_path(paths, manifest);
     let config = runtime
@@ -306,8 +396,17 @@ fn install_runtime(
         &environment,
         cancellation,
         ErrorCode::InferenceFailed,
+        None,
     )?;
     let verified = parse_self_test_event(&self_test)?;
+    emit_progress(
+        emit,
+        update(
+            InitializationStep::SelfTesting,
+            0.99,
+            "validated private worker self-test",
+        ),
+    );
     fs::write(runtime.join("self-test.json"), serde_json::to_vec(&serde_json::json!({"manifestDigest": manifest.digest(&fs::read(bootstrap.join("runtime-manifest.json")).map_err(runtime_error)?), "profile":"cuda", "worker": verified})).map_err(|_| invalid("self test serialization"))?).map_err(runtime_error)?;
     fs::write(runtime.join("READY"), b"ready\n").map_err(runtime_error)
 }
@@ -316,30 +415,40 @@ fn install_ffmpeg(
     runtime: &Path,
     manifest: &RuntimeManifest,
     cancellation: &CancellationToken,
-    emit: &mut impl FnMut(InitUpdate),
+    emit: &InitEventSink,
 ) -> Result<(), AppError> {
+    emit_activity(
+        emit,
+        InitializationStep::PreparingTools,
+        InitializationActivityLevel::Download,
+        "downloadingAudioTools",
+        None,
+    );
     let archive = paths
         .downloads()
         .join(format!("ffmpeg-{}.zip", manifest.ffmpeg.version));
     let start = Instant::now();
     let downloader = Downloader::new()?;
     let mut progress = |p: DownloadProgress| {
-        let fraction = p
-            .total_bytes
-            .map(|total| p.completed_bytes as f64 / total as f64)
-            .unwrap_or(0.0)
-            .clamp(0.0, 1.0);
-        emit(InitUpdate {
-            step: InitializationStep::PreparingTools,
-            current: ProgressValue::Determinate { fraction },
-            fraction: 0.60 + fraction * 0.05,
-            bytes: Some((
-                p.completed_bytes,
-                p.total_bytes,
-                speed(p.completed_bytes, start),
-            )),
-            detail: "downloading FFmpeg",
+        let fraction = p.total_bytes.map_or(0.0, |total| {
+            (p.completed_bytes as f64 / total as f64).clamp(0.0, 1.0)
         });
+        emit_progress(
+            emit,
+            InitUpdate {
+                step: InitializationStep::PreparingTools,
+                current: p.total_bytes.map_or(ProgressValue::Indeterminate, |_| {
+                    ProgressValue::Determinate { fraction }
+                }),
+                fraction: 0.02 + fraction * 0.03,
+                bytes: Some((
+                    p.completed_bytes,
+                    p.total_bytes,
+                    speed(p.completed_bytes, start),
+                )),
+                detail: "downloading FFmpeg",
+            },
+        );
     };
     downloader.download(
         &DownloadRequest {
@@ -370,46 +479,60 @@ fn install_ffmpeg(
             &env,
             cancellation,
             ErrorCode::FfmpegNotAvailable,
+            None,
         )?;
     }
-    emit(InitUpdate {
-        step: InitializationStep::PreparingTools,
-        current: ProgressValue::Determinate { fraction: 1.0 },
-        fraction: 0.65,
-        bytes: Some((
-            manifest.ffmpeg.archive_size_bytes,
-            Some(manifest.ffmpeg.archive_size_bytes),
-            speed(manifest.ffmpeg.archive_size_bytes, start),
-        )),
-        detail: "installed verified FFmpeg",
-    });
+    emit_progress(
+        emit,
+        InitUpdate {
+            step: InitializationStep::PreparingTools,
+            current: ProgressValue::Determinate { fraction: 1.0 },
+            fraction: 0.05,
+            bytes: Some((
+                manifest.ffmpeg.archive_size_bytes,
+                Some(manifest.ffmpeg.archive_size_bytes),
+                speed(manifest.ffmpeg.archive_size_bytes, start),
+            )),
+            detail: "installed verified FFmpeg",
+        },
+    );
     Ok(())
 }
 fn install_model(
     paths: &AppPaths,
     manifest: &RuntimeManifest,
     cancellation: &CancellationToken,
-    emit: &mut impl FnMut(InitUpdate),
+    emit: &InitEventSink,
 ) -> Result<(), AppError> {
+    emit_activity(
+        emit,
+        InitializationStep::DownloadingModel,
+        InitializationActivityLevel::Download,
+        "downloadingModel",
+        None,
+    );
     let target = model_path(paths, manifest);
     let start = Instant::now();
     let mut progress = |p: DownloadProgress| {
-        let fraction = p
-            .total_bytes
-            .map(|total| p.completed_bytes as f64 / total as f64)
-            .unwrap_or(0.0)
-            .clamp(0.0, 1.0);
-        emit(InitUpdate {
-            step: InitializationStep::DownloadingModel,
-            current: ProgressValue::Determinate { fraction },
-            fraction: 0.65 + fraction * 0.30,
-            bytes: Some((
-                p.completed_bytes,
-                p.total_bytes,
-                speed(p.completed_bytes, start),
-            )),
-            detail: "downloading model",
+        let fraction = p.total_bytes.map_or(0.0, |total| {
+            (p.completed_bytes as f64 / total as f64).clamp(0.0, 1.0)
         });
+        emit_progress(
+            emit,
+            InitUpdate {
+                step: InitializationStep::DownloadingModel,
+                current: p.total_bytes.map_or(ProgressValue::Indeterminate, |_| {
+                    ProgressValue::Determinate { fraction }
+                }),
+                fraction: 0.60 + fraction * 0.35,
+                bytes: Some((
+                    p.completed_bytes,
+                    p.total_bytes,
+                    speed(p.completed_bytes, start),
+                )),
+                detail: "downloading model",
+            },
+        );
     };
     Downloader::new()
         .map_err(model_download_error)?
@@ -424,17 +547,20 @@ fn install_model(
             &mut progress,
         )
         .map_err(model_download_error)?;
-    emit(InitUpdate {
-        step: InitializationStep::DownloadingModel,
-        current: ProgressValue::Determinate { fraction: 1.0 },
-        fraction: 0.95,
-        bytes: Some((
-            manifest.model.size_bytes,
-            Some(manifest.model.size_bytes),
-            speed(manifest.model.size_bytes, start),
-        )),
-        detail: "downloaded verified model",
-    });
+    emit_progress(
+        emit,
+        InitUpdate {
+            step: InitializationStep::DownloadingModel,
+            current: ProgressValue::Determinate { fraction: 1.0 },
+            fraction: 0.95,
+            bytes: Some((
+                manifest.model.size_bytes,
+                Some(manifest.model.size_bytes),
+                speed(manifest.model.size_bytes, start),
+            )),
+            detail: "downloaded verified model",
+        },
+    );
     Ok(())
 }
 
@@ -741,8 +867,9 @@ fn run(
     environment: &[(OsString, OsString)],
     cancellation: &CancellationToken,
     code: ErrorCode,
+    activity: Option<(InitializationStep, InitEventSink)>,
 ) -> Result<(), AppError> {
-    run_output(exe, args, cwd, environment, cancellation, code).map(|_| ())
+    run_output(exe, args, cwd, environment, cancellation, code, activity).map(|_| ())
 }
 fn run_output(
     exe: &Path,
@@ -751,8 +878,9 @@ fn run_output(
     environment: &[(OsString, OsString)],
     cancellation: &CancellationToken,
     code: ErrorCode,
+    activity: Option<(InitializationStep, InitEventSink)>,
 ) -> Result<crate::process::ProcessOutput, AppError> {
-    let result = capture_output(exe, args, cwd, environment, cancellation, code)?;
+    let result = capture_output(exe, args, cwd, environment, cancellation, code, activity)?;
     if result.exit_code == Some(0) {
         Ok(result)
     } else {
@@ -767,6 +895,7 @@ fn capture_output(
     environment: &[(OsString, OsString)],
     cancellation: &CancellationToken,
     code: ErrorCode,
+    activity: Option<(InitializationStep, InitEventSink)>,
 ) -> Result<crate::process::ProcessOutput, AppError> {
     let mut spec = ProcessSpec::new(exe);
     spec.arguments = args.iter().map(OsString::from).collect();
@@ -779,14 +908,241 @@ fn capture_output(
         spec.stderr_log =
             Some(PathBuf::from(directory).join(format!("runtime-{}.stderr.log", Uuid::new_v4())));
     }
-    ProcessRunner::run(spec, cancellation.clone(), Arc::new(|_| {})).map_err(|e| {
-        if e.code == ErrorCode::TaskCancelled {
-            e
-        } else {
-            AppError::new(code, e.technical_detail)
-        }
-    })
+    let on_stderr_line: Arc<dyn Fn(String) + Send + Sync> = match activity {
+        Some((step, emit)) => Arc::new(move |line| {
+            if let Some(activity) = parse_uv_activity(step, &line) {
+                emit(InitEvent::Activity(activity));
+            }
+        }),
+        None => Arc::new(|_| {}),
+    };
+    ProcessRunner::run_streaming(spec, cancellation.clone(), Arc::new(|_| {}), on_stderr_line)
+        .map_err(|e| {
+            if e.code == ErrorCode::TaskCancelled {
+                e
+            } else {
+                AppError::new(code, e.technical_detail)
+            }
+        })
 }
+
+fn emit_progress(emit: &InitEventSink, update: InitUpdate) {
+    emit(InitEvent::Progress(update));
+}
+
+fn emit_activity(
+    emit: &InitEventSink,
+    step_id: InitializationStep,
+    level: InitializationActivityLevel,
+    message: &str,
+    package_name: Option<String>,
+) {
+    emit(InitEvent::Activity(InitializationActivity {
+        step_id,
+        level,
+        message: message.into(),
+        package_name,
+        completed_units: None,
+        total_units: None,
+    }));
+}
+
+fn parse_uv_activity(
+    step_id: InitializationStep,
+    raw_line: &str,
+) -> Option<InitializationActivity> {
+    let line = strip_terminal_formatting(raw_line);
+    let line = line.trim();
+    if line.is_empty() {
+        return None;
+    }
+
+    if line
+        .strip_prefix("Downloading ")
+        .and_then(first_safe_package_token)
+        .is_some()
+    {
+        return Some(activity(
+            step_id,
+            InitializationActivityLevel::Download,
+            "downloadingPackage",
+            None,
+            None,
+        ));
+    }
+    if line
+        .strip_prefix("Downloaded ")
+        .and_then(first_safe_package_token)
+        .is_some()
+    {
+        return Some(activity(
+            step_id,
+            InitializationActivityLevel::Download,
+            "downloadedPackage",
+            None,
+            None,
+        ));
+    }
+    if line
+        .strip_prefix('+')
+        .map(str::trim_start)
+        .and_then(first_safe_package_token)
+        .is_some()
+    {
+        return Some(activity(
+            step_id,
+            InitializationActivityLevel::Install,
+            "installedPackage",
+            None,
+            None,
+        ));
+    }
+    if let Some(version) = line
+        .strip_prefix("Installed Python ")
+        .and_then(first_safe_version_token)
+    {
+        return Some(activity(
+            step_id,
+            InitializationActivityLevel::Install,
+            "installedPython",
+            Some(format!("Python {version}")),
+            None,
+        ));
+    }
+
+    for (prefix, message, level) in [
+        (
+            "Resolving ",
+            "resolvingPackages",
+            InitializationActivityLevel::Status,
+        ),
+        (
+            "Resolved ",
+            "resolvedPackages",
+            InitializationActivityLevel::Status,
+        ),
+        (
+            "Preparing ",
+            "preparingPackages",
+            InitializationActivityLevel::Install,
+        ),
+        (
+            "Prepared ",
+            "preparedPackages",
+            InitializationActivityLevel::Install,
+        ),
+        (
+            "Installing ",
+            "installingPackages",
+            InitializationActivityLevel::Install,
+        ),
+        (
+            "Installed ",
+            "installedPackages",
+            InitializationActivityLevel::Install,
+        ),
+        (
+            "Auditing ",
+            "auditingPackages",
+            InitializationActivityLevel::Status,
+        ),
+        (
+            "Audited ",
+            "auditedPackages",
+            InitializationActivityLevel::Status,
+        ),
+    ] {
+        if let Some(count) = line.strip_prefix(prefix).and_then(package_count) {
+            return Some(activity(step_id, level, message, None, Some(count)));
+        }
+    }
+    None
+}
+
+fn activity(
+    step_id: InitializationStep,
+    level: InitializationActivityLevel,
+    message: &str,
+    package_name: Option<String>,
+    completed_units: Option<u64>,
+) -> InitializationActivity {
+    InitializationActivity {
+        step_id,
+        level,
+        message: message.into(),
+        package_name,
+        completed_units,
+        total_units: None,
+    }
+}
+
+fn first_safe_package_token(value: &str) -> Option<String> {
+    let token = value.split_ascii_whitespace().next()?;
+    let package = token.split_once("==").map_or(token, |(name, _)| name);
+    if !package.is_empty()
+        && package.len() <= 100
+        && package
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
+    {
+        Some(package.into())
+    } else {
+        None
+    }
+}
+
+fn first_safe_version_token(value: &str) -> Option<&str> {
+    let token = value.split_ascii_whitespace().next()?;
+    (!token.is_empty()
+        && token.len() <= 32
+        && token
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'.' | b'-' | b'+')))
+    .then_some(token)
+}
+
+fn package_count(value: &str) -> Option<u64> {
+    let mut tokens = value.split_ascii_whitespace();
+    let count = tokens.next()?.parse().ok()?;
+    matches!(tokens.next(), Some("package" | "packages")).then_some(count)
+}
+
+fn strip_terminal_formatting(value: &str) -> String {
+    #[derive(Clone, Copy)]
+    enum EscapeState {
+        Text,
+        Escape,
+        Csi,
+        Osc,
+        OscEscape,
+    }
+
+    let mut state = EscapeState::Text;
+    let mut sanitized = String::with_capacity(value.len());
+    for character in value.chars() {
+        state = match state {
+            EscapeState::Text if character == '\u{1b}' => EscapeState::Escape,
+            EscapeState::Text => {
+                if !character.is_control() || character == '\t' {
+                    sanitized.push(character);
+                }
+                EscapeState::Text
+            }
+            EscapeState::Escape if character == '[' => EscapeState::Csi,
+            EscapeState::Escape if character == ']' => EscapeState::Osc,
+            EscapeState::Escape => EscapeState::Text,
+            EscapeState::Csi if ('@'..='~').contains(&character) => EscapeState::Text,
+            EscapeState::Csi => EscapeState::Csi,
+            EscapeState::Osc if character == '\u{7}' => EscapeState::Text,
+            EscapeState::Osc if character == '\u{1b}' => EscapeState::OscEscape,
+            EscapeState::Osc => EscapeState::Osc,
+            EscapeState::OscEscape if character == '\\' => EscapeState::Text,
+            EscapeState::OscEscape => EscapeState::Osc,
+        };
+    }
+    sanitized
+}
+
 fn parse_self_test_event(
     output: &crate::process::ProcessOutput,
 ) -> Result<serde_json::Value, AppError> {
@@ -1071,11 +1427,11 @@ impl Drop for RuntimeMutex {
 #[cfg(test)]
 mod tests {
     use super::{
-        Entry, embedded_manifest_bytes, parse_self_test_event, private_environment,
-        resolve_active_runtime, safe_zip_path, verify_archive_descriptor,
+        Entry, embedded_manifest_bytes, parse_self_test_event, parse_uv_activity,
+        private_environment, resolve_active_runtime, safe_zip_path, verify_archive_descriptor,
         verify_extracted_entry_descriptor,
     };
-    use crate::domain::ErrorCode;
+    use crate::domain::{ErrorCode, InitializationActivityLevel, InitializationStep};
     use crate::process::ProcessOutput;
     use crate::runtime::AppPaths;
     use sha2::{Digest, Sha256};
@@ -1126,6 +1482,62 @@ mod tests {
         }
         assert!(runtime.join("python-bin").is_dir());
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn parses_only_sanitized_recognized_uv_activity() {
+        let downloading = parse_uv_activity(
+            InitializationStep::SyncingEnvironment,
+            "\u{1b}[2KDownloading torch (2.4 GiB)\u{1b}[0m",
+        )
+        .unwrap();
+        assert_eq!(downloading.message, "downloadingPackage");
+        assert_eq!(downloading.package_name, None);
+        assert!(matches!(
+            downloading.level,
+            InitializationActivityLevel::Download
+        ));
+
+        let resolved = parse_uv_activity(
+            InitializationStep::SyncingEnvironment,
+            "Resolved 72 packages in 1.2s",
+        )
+        .unwrap();
+        assert_eq!(resolved.message, "resolvedPackages");
+        assert_eq!(resolved.completed_units, Some(72));
+
+        let installed = parse_uv_activity(
+            InitializationStep::SyncingEnvironment,
+            "+ torchaudio==2.6.0+cu124",
+        )
+        .unwrap();
+        assert_eq!(installed.message, "installedPackage");
+        assert_eq!(installed.package_name, None);
+
+        let credential_shaped = parse_uv_activity(
+            InitializationStep::SyncingEnvironment,
+            "Downloading ghp_secretToken123",
+        )
+        .unwrap();
+        assert_eq!(credential_shaped.message, "downloadingPackage");
+        assert_eq!(credential_shaped.package_name, None);
+    }
+
+    #[test]
+    fn rejects_untrusted_or_path_bearing_uv_output() {
+        for line in [
+            "Traceback (most recent call last):",
+            "Authorization: Bearer secret",
+            "Downloading https://example.invalid/token",
+            r"Downloading C:\Users\person\package.whl",
+            r"File \\server\share\worker.py, line 2",
+            "arbitrary terminal output",
+        ] {
+            assert!(
+                parse_uv_activity(InitializationStep::SyncingEnvironment, line).is_none(),
+                "{line}"
+            );
+        }
     }
 
     #[test]

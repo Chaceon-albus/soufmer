@@ -184,6 +184,15 @@ impl ProcessRunner {
         cancellation: CancellationToken,
         on_stdout_line: Arc<dyn Fn(String) + Send + Sync>,
     ) -> Result<ProcessOutput, AppError> {
+        Self::run_streaming(spec, cancellation, on_stdout_line, Arc::new(|_| {}))
+    }
+
+    pub fn run_streaming(
+        spec: ProcessSpec,
+        cancellation: CancellationToken,
+        on_stdout_line: Arc<dyn Fn(String) + Send + Sync>,
+        on_stderr_line: Arc<dyn Fn(String) + Send + Sync>,
+    ) -> Result<ProcessOutput, AppError> {
         let spec = prepare_spec_for_child(spec)?;
         if cancellation.is_cancelled() {
             return Err(AppError::new(
@@ -259,8 +268,9 @@ impl ProcessRunner {
         let stderr = child.stderr.take().expect("stderr pipe configured");
         let stdout_handle = thread::spawn(move || read_stdout_lines(stdout, combined_callback));
         let stderr_limit = spec.stderr_limit_bytes;
-        let stderr_handle =
-            thread::spawn(move || read_bounded_stderr(stderr, stderr_limit, stderr_log));
+        let stderr_handle = thread::spawn(move || {
+            read_bounded_stderr(stderr, stderr_limit, stderr_log, on_stderr_line)
+        });
         let exit_code = wait_for_child_or_cancel(&mut child, &job, &cancellation)?;
         let stdout_line_count = stdout_handle.join().map_err(|_| {
             AppError::new(
@@ -334,10 +344,14 @@ fn read_bounded_stderr(
     stderr: impl Read,
     limit: usize,
     mut log: Option<File>,
+    callback: Arc<dyn Fn(String) + Send + Sync>,
 ) -> std::io::Result<(String, bool)> {
+    const MAX_STREAMED_LINE_BYTES: usize = 8 * 1024;
     let mut bounded = VecDeque::with_capacity(limit.min(64 * 1024));
     let mut truncated = false;
     let mut buffer = [0_u8; 8192];
+    let mut streamed_line = Vec::new();
+    let mut streamed_line_overflowed = false;
     let mut source = stderr;
     loop {
         let read = source.read(&mut buffer)?;
@@ -348,6 +362,17 @@ fn read_bounded_stderr(
             log.write_all(&buffer[..read])?;
         }
         for byte in &buffer[..read] {
+            if matches!(*byte, b'\r' | b'\n') {
+                if !streamed_line.is_empty() && !streamed_line_overflowed {
+                    callback(String::from_utf8_lossy(&streamed_line).into_owned());
+                }
+                streamed_line.clear();
+                streamed_line_overflowed = false;
+            } else if streamed_line.len() < MAX_STREAMED_LINE_BYTES {
+                streamed_line.push(*byte);
+            } else {
+                streamed_line_overflowed = true;
+            }
             if bounded.len() == limit {
                 bounded.pop_front();
                 truncated = true;
@@ -356,6 +381,9 @@ fn read_bounded_stderr(
                 bounded.push_back(*byte);
             }
         }
+    }
+    if !streamed_line.is_empty() && !streamed_line_overflowed {
+        callback(String::from_utf8_lossy(&streamed_line).into_owned());
     }
     Ok((
         String::from_utf8_lossy(bounded.make_contiguous()).into_owned(),
@@ -429,8 +457,9 @@ impl Drop for JobObject {
 mod tests {
     use super::{CancellationToken, ProcessRunner, ProcessSpec, external_process_path};
     use std::{
+        io::Cursor,
         path::{Path, PathBuf},
-        sync::Arc,
+        sync::{Arc, Mutex},
         thread,
         time::Duration,
     };
@@ -497,5 +526,29 @@ mod tests {
         assert!(super::INHERITED_CONFIGURATION_VARIABLES.contains(&"PYTHONPATH"));
         assert!(super::INHERITED_CONFIGURATION_VARIABLES.contains(&"UV_CONFIG_FILE"));
         assert!(!super::INHERITED_CONFIGURATION_VARIABLES.contains(&"HTTPS_PROXY"));
+    }
+
+    #[test]
+    fn streams_stderr_lines_while_preserving_bounded_diagnostics() {
+        let lines = Arc::new(Mutex::new(Vec::new()));
+        let captured = Arc::clone(&lines);
+        let callback: Arc<dyn Fn(String) + Send + Sync> = Arc::new(move |line| {
+            captured.lock().unwrap().push(line);
+        });
+
+        let (stderr, truncated) = super::read_bounded_stderr(
+            Cursor::new(b"Downloading torch\rDownloaded torch\nlast line"),
+            24,
+            None,
+            callback,
+        )
+        .unwrap();
+
+        assert_eq!(
+            *lines.lock().unwrap(),
+            ["Downloading torch", "Downloaded torch", "last line"]
+        );
+        assert!(truncated);
+        assert_eq!(stderr.len(), 24);
     }
 }

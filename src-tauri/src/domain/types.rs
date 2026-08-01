@@ -165,6 +165,27 @@ pub struct InitializationProgress {
 }
 #[derive(Clone, Copy, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub enum InitializationActivityLevel {
+    Status,
+    Download,
+    Install,
+    Warning,
+}
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InitializationActivity {
+    pub step_id: InitializationStep,
+    pub level: InitializationActivityLevel,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub package_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub completed_units: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_units: Option<u64>,
+}
+#[derive(Clone, Copy, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub enum BatchStage {
     Probing,
     PreparingInput,

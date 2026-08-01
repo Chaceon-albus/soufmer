@@ -163,16 +163,18 @@ pub fn start_initialization(
         accepted_at: chrono_timestamp(),
     };
     thread::spawn(move || {
-        let result = crate::runtime::AppPaths::discover().and_then(|paths| {
-            crate::runtime::initialize(&paths, &task.cancelled, &mut |update| {
+        let event_app = app.clone();
+        let event_task = Arc::clone(&task);
+        let event_sink: crate::runtime::InitEventSink = Arc::new(move |event| match event {
+            crate::runtime::InitEvent::Progress(update) => {
                 let (bytes_completed, bytes_total, bytes_per_second) = update
                     .bytes
                     .map_or((None, None, None), |(completed, total, speed)| {
                         (Some(completed), total, Some(speed))
                     });
                 emit(
-                    &app,
-                    &task,
+                    &event_app,
+                    &event_task,
                     EventName::RuntimeProgress,
                     InitializationProgress {
                         runtime_version: "private-runtime".into(),
@@ -189,8 +191,18 @@ pub fn start_initialization(
                         detail: Some(update.detail.into()),
                     },
                 );
-            })
+            }
+            crate::runtime::InitEvent::Activity(activity) => {
+                emit(
+                    &event_app,
+                    &event_task,
+                    EventName::RuntimeActivity,
+                    activity,
+                );
+            }
         });
+        let result = crate::runtime::AppPaths::discover()
+            .and_then(|paths| crate::runtime::initialize(&paths, &task.cancelled, event_sink));
         match result {
             Ok(()) => match crate::runtime::AppPaths::discover()
                 .and_then(|paths| crate::runtime::environment_status(&paths))

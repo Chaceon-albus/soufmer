@@ -3,6 +3,7 @@ import {
   backendEventSchema,
   diagnosticReportSchema,
   environmentStatusSchema,
+  initializationActivitySchema,
   initializationProgressSchema,
   licenseNoticesSchema,
   readyEnvironmentSchema,
@@ -36,6 +37,14 @@ describe("backend event schemas", () => {
       current: { kind: "indeterminate" },
       detail: null,
     }).detail).toBeUndefined();
+  });
+
+  it("accepts only structured initialization activity messages", () => {
+    const activity = { stepId: "syncingEnvironment", level: "download", message: "downloadingPackage", packageName: "torch" };
+    expect(initializationActivitySchema.safeParse(activity).success).toBe(true);
+    expect(initializationActivitySchema.safeParse({ ...activity, message: "Downloading C:\\Users\\person\\token" }).success).toBe(false);
+    expect(initializationActivitySchema.safeParse({ ...activity, packageName: "C:\\Users\\person\\token" }).success).toBe(false);
+    expect(initializationActivitySchema.safeParse({ ...activity, packageName: "x".repeat(108) }).success).toBe(false);
   });
 
   it("accepts only nonempty persisted diagnostic reports", () => {

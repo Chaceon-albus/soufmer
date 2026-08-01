@@ -1,19 +1,21 @@
 import { useEffect, useState } from "react";
-import { batchItemSchema, batchProgressSchema, backendErrorSchema, backendEventSchema, batchResultSchema, initializationProgressSchema, readyEnvironmentSchema } from "@/types/backend";
+import { batchItemSchema, batchProgressSchema, backendErrorSchema, backendEventSchema, batchResultSchema, initializationActivitySchema, initializationProgressSchema, readyEnvironmentSchema } from "@/types/backend";
 import { eventNames, subscribe, toAppError, toBatchResult } from "@/lib/ipc";
 import type { BackendEventName } from "@/lib/ipc";
 
 type Handlers = {
   onInitializationProgress: (event: { taskId: string; sequence: number; progress: ReturnType<typeof initializationProgressSchema.parse> }) => void;
+  onInitializationActivity: (event: { taskId: string; sequence: number; activity: ReturnType<typeof initializationActivitySchema.parse> }) => void;
   onInitializationCompleted: (event: { taskId: string; sequence: number; environment: ReturnType<typeof readyEnvironmentSchema.parse> }) => void;
   onBatchProgress: (event: { taskId: string; sequence: number; progress: ReturnType<typeof batchProgressSchema.parse> }) => void;
   onItemCompleted: (event: { taskId: string; sequence: number }) => void;
   onCompleted: (event: { taskId: string; result: ReturnType<typeof toBatchResult> }) => void;
-  onFailed: (event: { taskId: string; error: ReturnType<typeof toAppError> }) => void;
-  onCancelled: (taskId: string) => void;
+  onFailed: (event: { taskId: string; sequence: number; error: ReturnType<typeof toAppError> }) => void;
+  onCancelled: (event: { taskId: string; sequence: number }) => void;
 };
 const schemas = {
   "runtime://progress": backendEventSchema("runtime://progress", initializationProgressSchema),
+  "runtime://activity": backendEventSchema("runtime://activity", initializationActivitySchema),
   "runtime://completed": backendEventSchema("runtime://completed", readyEnvironmentSchema),
   "batch://progress": backendEventSchema("batch://progress", batchProgressSchema),
   "batch://item-completed": backendEventSchema("batch://item-completed", batchItemSchema),
@@ -54,10 +56,11 @@ export function useBackendEvents(handlers: Handlers) {
 
 function routeEvent(name: BackendEventName, event: { taskId: string; sequence: number; payload: unknown }, handlers: Handlers) {
   if (name === "runtime://progress") handlers.onInitializationProgress({ taskId: event.taskId, sequence: event.sequence, progress: initializationProgressSchema.parse(event.payload) });
+  if (name === "runtime://activity") handlers.onInitializationActivity({ taskId: event.taskId, sequence: event.sequence, activity: initializationActivitySchema.parse(event.payload) });
   if (name === "runtime://completed") handlers.onInitializationCompleted({ taskId: event.taskId, sequence: event.sequence, environment: readyEnvironmentSchema.parse(event.payload) });
   if (name === "batch://progress") handlers.onBatchProgress({ taskId: event.taskId, sequence: event.sequence, progress: batchProgressSchema.parse(event.payload) });
   if (name === "batch://item-completed") handlers.onItemCompleted({ taskId: event.taskId, sequence: event.sequence });
   if (name === "batch://completed") handlers.onCompleted({ taskId: event.taskId, result: toBatchResult(event.payload) });
-  if (name === "task://failed") handlers.onFailed({ taskId: event.taskId, error: toAppError(event.payload) });
-  if (name === "task://cancelled") handlers.onCancelled(event.taskId);
+  if (name === "task://failed") handlers.onFailed({ taskId: event.taskId, sequence: event.sequence, error: toAppError(event.payload) });
+  if (name === "task://cancelled") handlers.onCancelled({ taskId: event.taskId, sequence: event.sequence });
 }

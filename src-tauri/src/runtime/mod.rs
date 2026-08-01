@@ -5,7 +5,8 @@ mod paths;
 mod settings;
 
 pub use initializer::{
-    ActiveRuntime, InitUpdate, environment_status, initialize, resolve_active_runtime,
+    ActiveRuntime, InitEvent, InitEventSink, InitUpdate, environment_status, initialize,
+    resolve_active_runtime,
 };
 pub use manifest::RuntimeManifest;
 pub use paths::AppPaths;

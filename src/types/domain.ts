@@ -24,6 +24,8 @@ export type EnvironmentStatus =
 
 export interface ProgressValue { kind: "determinate" | "indeterminate"; fraction?: number }
 export interface InitializationProgress { runtimeVersion: string; stepIndex: number; stepCount: number; stepId: string; overall: ProgressValue; current: ProgressValue; bytesCompleted?: number; bytesTotal?: number; bytesPerSecond?: number; detail?: string }
+export interface InitializationActivity { stepId: string; level: "status" | "download" | "install" | "warning"; message: string; packageName?: string; completedUnits?: number; totalUnits?: number }
+export interface InitializationActivityEntry { sequence: number; activity: InitializationActivity }
 export interface BatchProgress { itemIndex: number; itemCount: number; currentInputPath: string; currentDisplayName: string; stage: string; overall: ProgressValue; current: ProgressValue; completedDurationSeconds: number; totalDurationSeconds: number; elapsedSeconds: number }
 export interface BatchItemResult { itemIndex: number; inputPath: string; outputs: string[]; durationSeconds: number; warnings: string[]; errorCode?: string | null }
 export interface BatchResult { taskId: string; outputDirectory: string; succeeded: number; failed: number; skipped: number; cancelled: boolean; items: BatchItemResult[] }
