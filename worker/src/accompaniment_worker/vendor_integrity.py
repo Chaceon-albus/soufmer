@@ -35,7 +35,7 @@ def verify_vendor_integrity(root: Path | None = None) -> None:
     upstream = manifest.get("upstream")
     if not isinstance(upstream, dict) or len(upstream.get("commit", "")) != 40:
         raise ValueError("Vendor manifest has no immutable upstream commit")
-    allowed = {"MSST_LICENSE", "UPSTREAM.md", "source-manifest.json", "model-manifest.json"}
+    allowed = {"__init__.py", "MSST_LICENSE", "UPSTREAM.md", "source-manifest.json", "model-manifest.json"}
     for entry in manifest.get("files", []):
         if _sha256(base / entry["path"]) != entry["vendoredSha256"]:
             raise ValueError(f"Vendored file hash mismatch: {entry['path']}")

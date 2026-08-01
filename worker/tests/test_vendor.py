@@ -49,6 +49,15 @@ def test_unrecorded_vendor_file_is_rejected_without_importing_torch(tmp_path: Pa
         verify_vendor_integrity(copied_vendor)
 
 
+def test_installed_vendor_package_marker_is_allowed(tmp_path: Path) -> None:
+    source = vendor_root()
+    copied_vendor = tmp_path / "vendor"
+    shutil.copytree(source, copied_vendor)
+    (copied_vendor / "__init__.py").write_text("", encoding="utf-8")
+
+    verify_vendor_integrity(copied_vendor)
+
+
 def test_pinned_kimberley_config_loads_without_model_import() -> None:
     config = load_kimberley_config(vendor_root() / "msst/configs/KimberleyJensen/config_vocals_mel_band_roformer_kj.yaml")
     assert config["audio"]["sample_rate"] == 44_100
