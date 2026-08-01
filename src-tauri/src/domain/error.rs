@@ -19,6 +19,8 @@ pub enum ErrorCode {
     InputUnsupported,
     #[serde(rename = "OUTPUT_NOT_WRITABLE")]
     OutputNotWritable,
+    #[serde(rename = "PATH_UNSUPPORTED")]
+    PathUnsupported,
     #[serde(rename = "CUDA_NOT_AVAILABLE")]
     CudaNotAvailable,
     #[serde(rename = "CUDA_OUT_OF_MEMORY")]
@@ -52,6 +54,7 @@ impl ErrorCode {
             Self::FfmpegNotAvailable => "error.ffmpegNotAvailable",
             Self::InputUnsupported => "error.inputUnsupported",
             Self::OutputNotWritable => "error.outputNotWritable",
+            Self::PathUnsupported => "error.pathUnsupported",
             Self::CudaNotAvailable => "error.cudaNotAvailable",
             Self::CudaOutOfMemory => "error.cudaOutOfMemory",
             Self::InferenceFailed => "error.inferenceFailed",
@@ -104,7 +107,8 @@ impl AppError {
             ErrorCode::SettingsInvalid => ErrorStage::Settings,
             ErrorCode::InvalidRequest
             | ErrorCode::InputUnsupported
-            | ErrorCode::OutputNotWritable => ErrorStage::Validation,
+            | ErrorCode::OutputNotWritable
+            | ErrorCode::PathUnsupported => ErrorStage::Validation,
             _ => ErrorStage::Runtime,
         };
         Self {
@@ -113,7 +117,9 @@ impl AppError {
             message_key: code.message_key().into(),
             recoverable: !matches!(
                 code,
-                ErrorCode::InvalidRequest | ErrorCode::InputUnsupported
+                ErrorCode::InvalidRequest
+                    | ErrorCode::InputUnsupported
+                    | ErrorCode::PathUnsupported
             ),
             diagnostic_id: uuid::Uuid::new_v4().to_string(),
             item_path: None,

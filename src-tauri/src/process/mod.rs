@@ -3,8 +3,8 @@ use std::{
     ffi::OsString,
     fs::{File, OpenOptions},
     io::{BufRead, BufReader, Read, Write},
-    os::windows::{io::AsRawHandle, process::CommandExt},
-    path::PathBuf,
+    os::windows::{ffi::OsStrExt, io::AsRawHandle, process::CommandExt},
+    path::{Path, PathBuf, Prefix},
     process::{Child, Command, Stdio},
     sync::{
         Arc,
@@ -26,6 +26,21 @@ use windows_sys::Win32::{
 use crate::domain::{AppError, ErrorCode};
 
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+const MAX_NORMAL_PROCESS_PATH_UTF16_UNITS: usize = 259;
+const PATH_ENVIRONMENT_VARIABLES: &[&str] = &[
+    "TEMP",
+    "TMP",
+    "UV_CACHE_DIR",
+    "UV_PYTHON_INSTALL_DIR",
+    "UV_PYTHON_BIN_DIR",
+    "UV_PROJECT_ENVIRONMENT",
+    "HF_HOME",
+    "TORCH_HOME",
+    "XDG_CACHE_HOME",
+    "MPLCONFIGDIR",
+    "NUMBA_CACHE_DIR",
+    "SOUFMER_RUNTIME_LOG_DIR",
+];
 const INHERITED_CONFIGURATION_VARIABLES: &[&str] = &[
     "PYTHONHOME",
     "PYTHONPATH",
@@ -93,12 +108,83 @@ pub struct ProcessOutput {
 
 pub struct ProcessRunner;
 
+pub fn external_process_path(path: &Path) -> Result<PathBuf, AppError> {
+    let prefix = path
+        .components()
+        .next()
+        .ok_or_else(|| path_unsupported(path))?;
+    let normalized = match prefix {
+        std::path::Component::Prefix(prefix) => match prefix.kind() {
+            Prefix::Disk(_) | Prefix::UNC(_, _) => path.to_path_buf(),
+            Prefix::VerbatimDisk(drive) => {
+                let rest = path
+                    .strip_prefix(prefix.as_os_str())
+                    .map_err(path_unsupported)?;
+                let mut normalized = PathBuf::from(format!("{}:\\", char::from(drive)));
+                normalized.push(rest.strip_prefix("\\").unwrap_or(rest));
+                normalized
+            }
+            Prefix::VerbatimUNC(server, share) => {
+                let server = server.to_str().ok_or_else(|| path_unsupported(path))?;
+                let share = share.to_str().ok_or_else(|| path_unsupported(path))?;
+                let rest = path
+                    .strip_prefix(prefix.as_os_str())
+                    .map_err(path_unsupported)?;
+                let mut normalized = PathBuf::from(format!(r"\\{server}\{share}"));
+                normalized.push(rest.strip_prefix("\\").unwrap_or(rest));
+                normalized
+            }
+            Prefix::DeviceNS(_) | Prefix::Verbatim(_) => return Err(path_unsupported(path)),
+        },
+        _ => return Err(path_unsupported(path)),
+    };
+    if !normalized.is_absolute()
+        || normalized.as_os_str().encode_wide().count() > MAX_NORMAL_PROCESS_PATH_UTF16_UNITS
+    {
+        return Err(path_unsupported(path));
+    }
+    Ok(normalized)
+}
+
+pub fn external_process_path_string(path: &Path) -> Result<String, AppError> {
+    external_process_path(path)?
+        .into_os_string()
+        .into_string()
+        .map_err(|_| path_unsupported(path))
+}
+
+fn path_unsupported(_: impl std::fmt::Debug) -> AppError {
+    AppError::new(
+        ErrorCode::PathUnsupported,
+        "validated path cannot be represented safely at a child-process boundary",
+    )
+}
+
+fn prepare_spec_for_child(mut spec: ProcessSpec) -> Result<ProcessSpec, AppError> {
+    spec.executable = external_process_path(&spec.executable)?;
+    spec.current_dir = spec
+        .current_dir
+        .as_deref()
+        .map(external_process_path)
+        .transpose()?;
+    for (name, value) in &mut spec.environment {
+        if PATH_ENVIRONMENT_VARIABLES
+            .iter()
+            .any(|candidate| name.to_string_lossy().eq_ignore_ascii_case(candidate))
+        {
+            *value = external_process_path(Path::new(value))?.into_os_string();
+        }
+    }
+    Ok(spec)
+}
+
 impl ProcessRunner {
     pub fn run(
         spec: ProcessSpec,
         cancellation: CancellationToken,
         on_stdout_line: Arc<dyn Fn(String) + Send + Sync>,
     ) -> Result<ProcessOutput, AppError> {
+        let spec = prepare_spec_for_child(spec)?;
         if cancellation.is_cancelled() {
             return Err(AppError::new(
                 ErrorCode::TaskCancelled,
@@ -341,8 +427,54 @@ impl Drop for JobObject {
 
 #[cfg(test)]
 mod tests {
-    use super::{CancellationToken, ProcessRunner, ProcessSpec};
-    use std::{path::PathBuf, sync::Arc, thread, time::Duration};
+    use super::{CancellationToken, ProcessRunner, ProcessSpec, external_process_path};
+    use std::{
+        path::{Path, PathBuf},
+        sync::Arc,
+        thread,
+        time::Duration,
+    };
+
+    #[test]
+    fn normalizes_supported_windows_process_paths() {
+        let cases = [
+            (r"C:\Music\song.wav", r"C:\Music\song.wav"),
+            (
+                r"\\server\share\Music\song.wav",
+                r"\\server\share\Music\song.wav",
+            ),
+            (
+                r"\\?\C:\Music folder\简体中文.wav",
+                r"C:\Music folder\简体中文.wav",
+            ),
+            (
+                r"\\?\UNC\snas.local\WD\Media\Record\简体中文 song.wav",
+                r"\\snas.local\WD\Media\Record\简体中文 song.wav",
+            ),
+        ];
+        for (input, expected) in cases {
+            assert_eq!(
+                external_process_path(Path::new(input)).unwrap(),
+                Path::new(expected)
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_unsafe_windows_process_paths() {
+        let overlong = format!(r"\\?\C:\{}\song.wav", "a".repeat(250));
+        for input in [
+            r"relative\song.wav",
+            r"C:song.wav",
+            r"\\?\",
+            r"\\.\PhysicalDrive0",
+            r"\\?\Volume{11111111-1111-1111-1111-111111111111}\song.wav",
+            &overlong,
+        ] {
+            let error = external_process_path(Path::new(input)).unwrap_err();
+            assert_eq!(error.code, crate::domain::ErrorCode::PathUnsupported);
+        }
+    }
 
     #[test]
     fn cancellation_terminates_a_controlled_child() {

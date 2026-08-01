@@ -4,6 +4,23 @@ Use generated tones or legally usable audio. Do not add copyrighted recordings t
 Record the executable build identity, runtime version, GPU/driver, input properties, selected
 options, result, and diagnostic ID for every failure.
 
+## 2026-08-02 stabilization evidence
+
+- Pre-fix reproduction used a generated one-second, 44.1 kHz stereo Float32 WAV under a path with
+  spaces and Simplified Chinese characters. The worker request contained canonical drive paths in
+  the form `\\?\C:\...` for the model input, vocals output, checkpoint, and configuration.
+- The installed private worker rejected that request before inference with JSON Lines code
+  `INVALID_REQUEST`, message `inputPath must remain within the assigned job directory`, and exit
+  code `2`. Bounded stderr was empty. The Rust lifecycle mapper collapsed this stable worker code to
+  `INFERENCE_FAILED`.
+- After the process-boundary repair, the ignored Rust smoke
+  `real_private_runtime_inference_publishes_local_output` passed in 19.65 seconds. It used the
+  initialized private CUDA runtime, generated a Unicode/space-path fixture, produced and validated
+  `vocals.wav`, built the compatibility residual, and published a validated Float32 WAV.
+- `\\nas.local\WD\Media` was not accessible from the development machine on 2026-08-02.
+  The real UNC inference smoke remains open; focused conversion coverage includes the exact
+  `\\?\UNC\nas.local\WD\Media\...` regression form.
+
 ## Development checks
 
 - Launch with `pnpm tauri dev`; verify the default locale is Simplified Chinese and no raw command

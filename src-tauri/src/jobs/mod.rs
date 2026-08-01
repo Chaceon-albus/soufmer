@@ -20,7 +20,10 @@ use crate::{
         AppError, BatchItemResult, BatchProgress, BatchResult, BatchStage, ConflictPolicy,
         ErrorCode, InputMode, OutputFormat, ProcessingMode, ProgressValue, StartBatchRequest,
     },
-    process::{CancellationToken, ProcessRunner, ProcessSpec},
+    process::{
+        CancellationToken, ProcessRunner, ProcessSpec, external_process_path,
+        external_process_path_string,
+    },
     progress::duration_weighted_fraction,
     runtime::AppPaths,
 };
@@ -185,7 +188,7 @@ impl InputProber for FfprobeInputProber {
             "-show_format".into(),
             "-of".into(),
             "json".into(),
-            input.as_os_str().into(),
+            external_process_path(input)?.into_os_string(),
         ];
         spec.stderr_log = Some(
             self.logs
@@ -208,6 +211,7 @@ pub fn preflight_plan(
     prober: &dyn InputProber,
 ) -> Result<BatchPlan, AppError> {
     ensure_output_directory(Path::new(&request.output_directory))?;
+    let output_root = canonical(Path::new(&request.output_directory))?;
     let inputs = enumerate_inputs(request)?;
     let total_input_count = inputs.len();
     let mut items = Vec::new();
@@ -223,7 +227,7 @@ pub fn preflight_plan(
                 }
                 failures.push(BatchItemResult {
                     item_index: (index + 1) as u32,
-                    input_path: input.absolute_path.display().to_string(),
+                    input_path: readable_path(&input.absolute_path),
                     outputs: Vec::new(),
                     duration_seconds: 0.0,
                     warnings: Vec::new(),
@@ -236,10 +240,10 @@ pub fn preflight_plan(
             input
                 .relative_path
                 .parent()
-                .map(|relative| PathBuf::from(&request.output_directory).join(relative))
-                .unwrap_or_else(|| PathBuf::from(&request.output_directory))
+                .map(|relative| output_root.join(relative))
+                .unwrap_or_else(|| output_root.clone())
         } else {
-            PathBuf::from(&request.output_directory)
+            output_root.clone()
         };
         ensure_output_directory(&item_output_directory)?;
         let outputs = plan_item_outputs(
@@ -269,7 +273,7 @@ pub fn preflight_plan(
     Ok(BatchPlan {
         items,
         preflight_failures: failures,
-        output_directory: PathBuf::from(&request.output_directory),
+        output_directory: output_root,
         total_duration_seconds,
         skipped,
         total_input_count,
@@ -502,14 +506,8 @@ impl ProductionBatchExecutor {
         spec.current_dir = Some(cwd.to_path_buf());
         spec.environment = runtime.environment.clone();
         spec.stderr_log = Some(log);
-        let result =
-            ProcessRunner::run(spec, cancellation.clone(), Arc::new(|_| {})).map_err(|error| {
-                if error.code == ErrorCode::TaskCancelled {
-                    error
-                } else {
-                    AppError::new(ErrorCode::PostprocessFailed, error.technical_detail)
-                }
-            })?;
+        let result = ProcessRunner::run(spec, cancellation.clone(), Arc::new(|_| {}))
+            .map_err(|error| map_process_error(error, ErrorCode::PostprocessFailed))?;
         if result.exit_code == Some(0) {
             Ok(())
         } else {
@@ -531,9 +529,9 @@ impl BatchExecutor for ProductionBatchExecutor {
         Self::ffmpeg(
             runtime,
             model_input_args(
-                &item.input.absolute_path,
+                &external_process_path(&item.input.absolute_path)?,
                 &item.source_info,
-                &paths.model_input,
+                &external_process_path(&paths.model_input)?,
             ),
             &paths.root,
             paths.logs.join("prepare.stderr.log"),
@@ -545,7 +543,7 @@ impl BatchExecutor for ProductionBatchExecutor {
             cancellation: cancellation.clone(),
         }
         .probe(&paths.model_input)
-        .map_err(|error| AppError::new(ErrorCode::PostprocessFailed, error.technical_detail))?;
+        .map_err(|error| map_process_error(error, ErrorCode::PostprocessFailed))?;
         if info.sample_rate != 44_100
             || info.channels != 2
             || info.sample_format.as_deref() != Some("flt")
@@ -642,9 +640,9 @@ impl BatchExecutor for ProductionBatchExecutor {
     ) -> Result<(), AppError> {
         let args = match output.mode {
             ProcessingMode::Compatibility44100 => compatibility_residual_args(
-                &paths.model_input,
-                &paths.vocals,
-                &output.partial_path,
+                &external_process_path(&paths.model_input)?,
+                &external_process_path(&paths.vocals)?,
+                &external_process_path(&output.partial_path)?,
                 output.format,
                 &item.source_info,
             ),
@@ -652,18 +650,18 @@ impl BatchExecutor for ProductionBatchExecutor {
                 Self::ffmpeg(
                     runtime,
                     source_native_args(
-                        &item.input.absolute_path,
+                        &external_process_path(&item.input.absolute_path)?,
                         &item.source_info,
-                        &paths.source_native,
+                        &external_process_path(&paths.source_native)?,
                     ),
                     &paths.root,
                     paths.logs.join("source-native.stderr.log"),
                     cancellation,
                 )?;
                 source_rate_residual_args(
-                    &paths.source_native,
-                    &paths.vocals,
-                    &output.partial_path,
+                    &external_process_path(&paths.source_native)?,
+                    &external_process_path(&paths.vocals)?,
+                    &external_process_path(&output.partial_path)?,
                     output.format,
                     &item.source_info,
                 )
@@ -697,7 +695,7 @@ impl BatchExecutor for ProductionBatchExecutor {
             cancellation: cancellation.clone(),
         }
         .probe(&output.partial_path)
-        .map_err(|error| AppError::new(ErrorCode::PostprocessFailed, error.technical_detail))?;
+        .map_err(|error| map_process_error(error, ErrorCode::PostprocessFailed))?;
         tracing::debug!(
             source_sample_rate = item.source_info.sample_rate,
             output_sample_rate = info.sample_rate,
@@ -741,9 +739,7 @@ fn worker_process_spec(
     paths: &JobPaths,
     request: &Path,
 ) -> Result<ProcessSpec, AppError> {
-    let request = request
-        .to_str()
-        .ok_or_else(|| AppError::new(ErrorCode::InferenceFailed, "request path invalid"))?;
+    let request = external_process_path(request)?;
     let temp = paths.root.join("tmp");
     fs::create_dir_all(&temp).map_err(job_error)?;
     let mut environment = runtime.environment.clone();
@@ -752,17 +748,14 @@ fn worker_process_spec(
         environment.push((name.into(), temp.clone().into_os_string()));
     }
     let mut spec = ProcessSpec::new(&runtime.python);
-    spec.arguments = [
-        "-I",
-        "-m",
-        runtime.worker_module.as_str(),
-        "separate",
-        "--request",
-        request,
-    ]
-    .into_iter()
-    .map(Into::into)
-    .collect();
+    spec.arguments = vec![
+        "-I".into(),
+        "-m".into(),
+        runtime.worker_module.clone().into(),
+        "separate".into(),
+        "--request".into(),
+        request.into_os_string(),
+    ];
     spec.current_dir = Some(runtime.worker_cwd.clone());
     spec.environment = environment;
     spec.stderr_log = Some(paths.logs.join("worker.stderr.log"));
@@ -771,8 +764,8 @@ fn worker_process_spec(
 fn absolute(path: &Path) -> Result<String, AppError> {
     if path.exists() {
         return fs::canonicalize(path)
-            .map(|value| value.display().to_string())
-            .map_err(job_error);
+            .map_err(job_error)
+            .and_then(|value| external_process_path_string(&value));
     }
     let parent = path
         .parent()
@@ -781,8 +774,22 @@ fn absolute(path: &Path) -> Result<String, AppError> {
         .file_name()
         .ok_or_else(|| AppError::new(ErrorCode::InferenceFailed, "path has no filename"))?;
     fs::canonicalize(parent)
-        .map(|parent| parent.join(name).display().to_string())
         .map_err(job_error)
+        .and_then(|parent| external_process_path_string(&parent.join(name)))
+}
+
+fn map_process_error(error: AppError, fallback: ErrorCode) -> AppError {
+    if matches!(
+        error.code,
+        ErrorCode::TaskCancelled | ErrorCode::PathUnsupported
+    ) {
+        error
+    } else {
+        AppError::new(fallback, error.technical_detail)
+    }
+}
+fn readable_path(path: &Path) -> String {
+    external_process_path_string(path).unwrap_or_else(|_| path.display().to_string())
 }
 fn worker_request_json(
     task_id: &str,
@@ -980,7 +987,7 @@ impl SequentialBatchRunner {
         let started = Instant::now();
         let mut result = BatchResult {
             task_id: task_id.into(),
-            output_directory: plan.output_directory.display().to_string(),
+            output_directory: readable_path(&plan.output_directory),
             succeeded: 0,
             failed: plan.preflight_failures.len() as u32,
             skipped: plan.skipped as u32,
@@ -1008,7 +1015,7 @@ impl SequentialBatchRunner {
                         result.failed += 1;
                         emit(BatchRunnerEvent::ItemCompleted(BatchItemResult {
                             item_index: item.item_index,
-                            input_path: item.input.absolute_path.display().to_string(),
+                            input_path: readable_path(&item.input.absolute_path),
                             outputs: Vec::new(),
                             duration_seconds: item.source_info.duration_seconds,
                             warnings: Vec::new(),
@@ -1144,7 +1151,7 @@ impl SequentialBatchRunner {
                     result.succeeded += 1;
                     result.items.push(BatchItemResult {
                         item_index: item.item_index,
-                        input_path: item.input.absolute_path.display().to_string(),
+                        input_path: readable_path(&item.input.absolute_path),
                         outputs,
                         duration_seconds: item.source_info.duration_seconds,
                         warnings: Vec::new(),
@@ -1172,7 +1179,7 @@ impl SequentialBatchRunner {
                     result.failed += 1;
                     let failed_item = BatchItemResult {
                         item_index: item.item_index,
-                        input_path: item.input.absolute_path.display().to_string(),
+                        input_path: readable_path(&item.input.absolute_path),
                         outputs: Vec::new(),
                         duration_seconds: item.source_info.duration_seconds,
                         warnings: Vec::new(),
@@ -1239,7 +1246,7 @@ fn emit_progress(
     emit(BatchRunnerEvent::Progress(BatchProgress {
         item_index: context.item.item_index,
         item_count: context.item_count as u32,
-        current_input_path: context.item.input.absolute_path.display().to_string(),
+        current_input_path: readable_path(&context.item.input.absolute_path),
         current_display_name: context.item.input.relative_path.display().to_string(),
         stage,
         overall: ProgressValue::Determinate { fraction: overall },
@@ -1268,7 +1275,7 @@ fn emit_postprocess_progress(
     emit(BatchRunnerEvent::Progress(BatchProgress {
         item_index: context.item.item_index,
         item_count: context.item_count as u32,
-        current_input_path: context.item.input.absolute_path.display().to_string(),
+        current_input_path: readable_path(&context.item.input.absolute_path),
         current_display_name: context.item.input.relative_path.display().to_string(),
         stage,
         overall: ProgressValue::Determinate { fraction: overall },
@@ -1777,6 +1784,16 @@ mod tests {
         assert_eq!(request["device"], "cuda:0");
         assert_eq!(request["batchSize"], 1);
         assert_eq!(request["overlap"], 4);
+        for field in [
+            "inputPath",
+            "outputVocalsPath",
+            "checkpointPath",
+            "configPath",
+        ] {
+            let value = request[field].as_str().unwrap();
+            assert!(Path::new(value).is_absolute());
+            assert!(!value.starts_with(r"\\?\"));
+        }
         let ready = format!(
             r#"{{"schemaVersion":1,"type":"ready","taskId":"{task}","payload":{{"device":"cuda:0"}}}}"#
         );
@@ -1875,5 +1892,79 @@ mod tests {
             ErrorCode::InferenceFailed
         );
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    #[ignore = "requires the initialized private CUDA runtime and a real NVIDIA GPU"]
+    fn real_private_runtime_inference_publishes_local_output() {
+        let app_paths = AppPaths::discover().unwrap();
+        let runtime = BatchRuntime::resolve(&app_paths).unwrap();
+        let root = temp_dir().join("GPU smoke 简体中文");
+        let input = root.join("input with spaces").join("简体中文 signal.wav");
+        let output = root.join("published output");
+        fs::create_dir_all(input.parent().unwrap()).unwrap();
+        fs::create_dir_all(&output).unwrap();
+        let mut fixture = ProcessSpec::new(&runtime.ffmpeg);
+        fixture.arguments = vec![
+            "-hide_banner".into(),
+            "-loglevel".into(),
+            "error".into(),
+            "-y".into(),
+            "-f".into(),
+            "lavfi".into(),
+            "-i".into(),
+            "sine=frequency=440:duration=1:sample_rate=44100".into(),
+            "-filter_complex".into(),
+            "[0:a]pan=stereo|c0=c0|c1=c0[out]".into(),
+            "-map".into(),
+            "[out]".into(),
+            "-c:a".into(),
+            "pcm_f32le".into(),
+            external_process_path(&input).unwrap().into_os_string(),
+        ];
+        fixture.current_dir = Some(root.clone());
+        let fixture_result =
+            ProcessRunner::run(fixture, CancellationToken::new(), Arc::new(|_| {})).unwrap();
+        assert_eq!(fixture_result.exit_code, Some(0));
+
+        let task_id = Uuid::new_v4().to_string();
+        let request = StartBatchRequest {
+            input_mode: InputMode::File,
+            input_path: input.display().to_string(),
+            output_directory: output.display().to_string(),
+            processing_mode: ProcessingMode::Compatibility44100,
+            recursive: false,
+            preserve_directory_structure: false,
+            conflict_policy: ConflictPolicy::Overwrite,
+            output_format: OutputFormat::WavFloat32,
+            generate_both_modes: false,
+        };
+        let prober = FfprobeInputProber {
+            ffprobe: runtime.ffprobe.clone(),
+            logs: app_paths.logs(),
+            cancellation: CancellationToken::new(),
+        };
+        let plan = preflight_plan(&request, &task_id, &prober).unwrap();
+        assert!(
+            !plan.items.is_empty(),
+            "preflight failures: {:?}",
+            plan.preflight_failures
+                .iter()
+                .map(|item| item.error_code)
+                .collect::<Vec<_>>()
+        );
+        let expected = plan.items[0].outputs[0].final_path.clone();
+        let runner = SequentialBatchRunner {
+            app_paths,
+            runtime,
+            executor: Arc::new(ProductionBatchExecutor),
+        };
+        let result = runner.run(&task_id, plan, &CancellationToken::new(), |_| {});
+        assert_eq!(
+            (result.succeeded, result.failed, result.cancelled),
+            (1, 0, false)
+        );
+        assert!(expected.is_file());
+        fs::remove_dir_all(root.parent().unwrap()).unwrap();
     }
 }

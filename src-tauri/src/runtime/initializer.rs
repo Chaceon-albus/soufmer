@@ -24,7 +24,7 @@ use crate::{
     download::{
         DownloadProgress, DownloadRequest, Downloader, ZipExtractionLimits, extract_zip_safely,
     },
-    process::{CancellationToken, ProcessRunner, ProcessSpec},
+    process::{CancellationToken, ProcessRunner, ProcessSpec, external_process_path_string},
     runtime::{
         AppPaths, RuntimeManifest, atomic_write_json,
         embedded::{
@@ -287,6 +287,8 @@ fn install_runtime(
     let model = model_path(paths, manifest);
     let config = runtime
         .join("worker/vendor/msst/configs/KimberleyJensen/config_vocals_mel_band_roformer_kj.yaml");
+    let model_argument = external_process_path_string(&model)?;
+    let config_argument = external_process_path_string(&config)?;
     let self_test = capture_output(
         &python,
         &[
@@ -294,9 +296,9 @@ fn install_runtime(
             "accompaniment_worker",
             "self-test",
             "--checkpoint",
-            model.to_str().unwrap_or_default(),
+            &model_argument,
             "--config",
-            config.to_str().unwrap_or_default(),
+            &config_argument,
             "--device",
             "cuda:0",
         ],
