@@ -21,17 +21,26 @@ extracting `uv.exe`.
 
 ## Downloaded FFmpeg runtime artifact
 
-- Provider: [Gyan.D FFmpeg Builds](https://www.gyan.dev/ffmpeg/builds/), a Windows provider linked by [ffmpeg.org](https://ffmpeg.org/download.html).
-- Versioned archive: https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-8.0.1-essentials_build.zip
-- Published checksum: https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-8.0.1-essentials_build.zip.sha256
-- Archive size: 106,259,850 bytes.
-- Archive SHA-256: `e2aaeaa0fdbc397d4794828086424d4aaa2102cef1fb6874f6ffd29c0b88b673`.
-- Archive root: `ffmpeg-8.0.1-essentials_build`.
+- Provider: [BtbN FFmpeg Builds](https://github.com/BtbN/FFmpeg-Builds), a Windows provider linked by [ffmpeg.org](https://ffmpeg.org/download.html).
+- Release tag and build: `autobuild-2026-02-28-12-59`, `n8.0.1-66-g27b8d1a017-20260228`.
+- Versioned archive: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-02-28-12-59/ffmpeg-n8.0.1-66-g27b8d1a017-win64-lgpl-8.0.zip
+- Published checksum list: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-02-28-12-59/checksums.sha256
+- Archive size: 193,842,056 bytes.
+- Archive SHA-256: `ef2b1179f226c7a953675623bff13e38ecd806a425f6f229e44660abdcd0c077`.
+- Archive root: `ffmpeg-n8.0.1-66-g27b8d1a017-win64-lgpl-8.0`.
 - Binaries: `bin/ffmpeg.exe` and `bin/ffprobe.exe`.
-- License classification: GPL-3.0. The exact `LICENSE` file in the verified ZIP is embedded as `FFMPEG_GPL-3.0.txt`.
+- License classification: LGPL-3.0. The exact `LICENSE.txt` in the verified ZIP is embedded as
+  `FFMPEG_LGPL-3.0.txt`; its SHA-256 is
+  `da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768`.
 
 The FFmpeg ZIP was downloaded to a temporary directory solely for independent SHA-256 verification
-and ZIP layout/license inspection. It is not committed or embedded.
+and ZIP layout/license inspection. It is not committed or embedded. Its configuration reports
+`--enable-libsoxr`, and the generated residual integration gate passed using SoXR precision 32.
+The prior Gyan.D essentials ZIP was rejected because it lacked libsoxr.
+
+BtbN retains monthly build releases for two years, so release maintenance must repin this artifact
+before February 2028. BtbN currently targets Windows 10 22H2 and newer and does not guarantee
+earlier Windows 10 revisions; portable release compatibility must be tested within that range.
 
 ## Model and CUDA profile
 

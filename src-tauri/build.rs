@@ -13,7 +13,7 @@ const ENTRY_MANIFEST_PATH: &str = "_bootstrap-entry-manifest.json";
 const REQUIRED_LICENSES: &[&str] = &[
     "UV_LICENSE_MIT.txt",
     "UV_LICENSE_APACHE.txt",
-    "FFMPEG_GPL-3.0.txt",
+    "FFMPEG_LGPL-3.0.txt",
     "SOURCES.md",
     "MODEL_NOTICE.md",
     "MODEL_CARD.md",

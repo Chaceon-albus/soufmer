@@ -77,12 +77,16 @@ Selected worker CUDA profile: official PyTorch CUDA 12.4 wheel index with versio
 
 ## FFmpeg and FFprobe
 
-The runtime downloads the fixed Gyan.D FFmpeg `8.0.1` essentials Windows x64 ZIP linked by the
-FFmpeg project. The archive is 106,259,850 bytes with SHA-256
-`e2aaeaa0fdbc397d4794828086424d4aaa2102cef1fb6874f6ffd29c0b88b673`. This selected build is
-GPL-3.0; the exact license file from the verified archive is included in the embedded bootstrap.
+The runtime downloads the fixed BtbN FFmpeg Windows x64 ZIP from release tag
+`autobuild-2026-02-28-12-59`, a build provider linked by the FFmpeg project. The exact build
+identity is `n8.0.1-66-g27b8d1a017-20260228`. The archive is 193,842,056 bytes with SHA-256
+`ef2b1179f226c7a953675623bff13e38ecd806a425f6f229e44660abdcd0c077`. This selected build is
+LGPL-3.0 and reports `--enable-libsoxr`; the exact `LICENSE.txt` from the verified archive is
+included in the embedded bootstrap.
 
 Project: <https://ffmpeg.org/>
+
+Build provider: <https://github.com/BtbN/FFmpeg-Builds>
 
 The immutable archive URL, extraction layout, and license record are stored in
 `src-tauri/bootstrap/runtime-manifest.json`.

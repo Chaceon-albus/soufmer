@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "bootstrapVersion": "2026.07.30.1",
+  "bootstrapVersion": "2026.08.01.1",
   "compatibleAppVersions": ">=0.1.0,<0.2.0",
   "platform": {
     "os": "windows",
@@ -46,19 +46,19 @@
     }
   },
   "ffmpeg": {
-    "version": "8.0.1",
-    "provider": "Gyan.D FFmpeg Builds",
-    "providerPageUrl": "https://www.gyan.dev/ffmpeg/builds/",
-    "archiveUrl": "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-8.0.1-essentials_build.zip",
-    "checksumUrl": "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-8.0.1-essentials_build.zip.sha256",
-    "archiveSha256": "e2aaeaa0fdbc397d4794828086424d4aaa2102cef1fb6874f6ffd29c0b88b673",
-    "archiveSizeBytes": 106259850,
-    "archiveRoot": "ffmpeg-8.0.1-essentials_build",
+    "version": "n8.0.1-66-g27b8d1a017-20260228",
+    "provider": "BtbN FFmpeg Builds",
+    "providerPageUrl": "https://github.com/BtbN/FFmpeg-Builds",
+    "archiveUrl": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-02-28-12-59/ffmpeg-n8.0.1-66-g27b8d1a017-win64-lgpl-8.0.zip",
+    "checksumUrl": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-02-28-12-59/checksums.sha256",
+    "archiveSha256": "ef2b1179f226c7a953675623bff13e38ecd806a425f6f229e44660abdcd0c077",
+    "archiveSizeBytes": 193842056,
+    "archiveRoot": "ffmpeg-n8.0.1-66-g27b8d1a017-win64-lgpl-8.0",
     "ffmpegPath": "bin/ffmpeg.exe",
     "ffprobePath": "bin/ffprobe.exe",
-    "licenseClassification": "GPL-3.0",
-    "licensePath": "LICENSE",
-    "embeddedLicensePath": "licenses/FFMPEG_GPL-3.0.txt"
+    "licenseClassification": "LGPL-3.0",
+    "licensePath": "LICENSE.txt",
+    "embeddedLicensePath": "licenses/FFMPEG_LGPL-3.0.txt"
   },
   "model": {
     "repository": "https://huggingface.co/KimberleyJSN/melbandroformer",

@@ -17,7 +17,7 @@ const MSST_NOTICE: &str = include_str!("../bootstrap/licenses/MSST_NOTICE.md");
 const MSST_LICENSE: &str = include_str!("../../worker/vendor/MSST_LICENSE");
 const MODEL_NOTICE: &str = include_str!("../bootstrap/licenses/MODEL_NOTICE.md");
 const MODEL_CARD: &str = include_str!("../bootstrap/licenses/MODEL_CARD.md");
-const FFMPEG_GPL: &str = include_str!("../bootstrap/licenses/FFMPEG_GPL-3.0.txt");
+const FFMPEG_LGPL: &str = include_str!("../bootstrap/licenses/FFMPEG_LGPL-3.0.txt");
 const SOURCES: &str = include_str!("../bootstrap/licenses/SOURCES.md");
 const RUNTIME_MANIFEST: &str = include_str!("../bootstrap/runtime-manifest.json");
 
@@ -62,9 +62,9 @@ pub fn license_notices() -> Vec<LicenseNotice> {
             text: MODEL_CARD,
         },
         LicenseNotice {
-            id: "ffmpeg-gpl-3.0",
-            title: "FFmpeg build — GNU GPL 3.0",
-            text: FFMPEG_GPL,
+            id: "ffmpeg-lgpl-3.0",
+            title: "FFmpeg build — GNU LGPL 3.0",
+            text: FFMPEG_LGPL,
         },
         LicenseNotice {
             id: "bootstrap-sources",
@@ -296,7 +296,7 @@ mod tests {
             "msst-mit",
             "model-notice",
             "model-card",
-            "ffmpeg-gpl-3.0",
+            "ffmpeg-lgpl-3.0",
             "bootstrap-sources",
         ] {
             assert!(
@@ -328,7 +328,7 @@ mod tests {
         assert!(
             notices
                 .iter()
-                .any(|notice| notice.text.contains("GNU GENERAL PUBLIC LICENSE"))
+                .any(|notice| notice.text.contains("GNU LESSER GENERAL PUBLIC LICENSE"))
         );
     }
 

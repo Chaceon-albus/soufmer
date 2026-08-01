@@ -2407,11 +2407,11 @@ Keep this phase intentionally small.
 
 ### Audio integration tests
 
-- [ ] Model-input conversion properties.
-- [ ] Zero-vocals identity.
-- [ ] Full-vocals cancellation.
-- [ ] 48/96 kHz experimental output sample rate.
-- [ ] Output inspection for sample rate, channel count, codec, sample format, and raw bit depth.
+- [x] Model-input conversion properties.
+- [x] Zero-vocals identity.
+- [x] Full-vocals cancellation.
+- [x] 48/96 kHz experimental output sample rate.
+- [x] Output inspection for sample rate, channel count, codec, sample format, and raw bit depth.
 
 ### Documentation
 
@@ -2916,6 +2916,19 @@ Torch and torchaudio in a `cuda` extra mapped to one fixed explicit PyTorch inde
 with locked project commands.
 Consequences: No normal workflow uses `uv pip install --reinstall` or `--no-sync`. A new CUDA
 backend requires a deliberate dependency/lock/runtime-profile update and a clean GPU validation.
+```
+
+```text
+2026-08-01 — Select a SoXR-enabled BtbN FFmpeg build
+Context: The initially selected Gyan.D 8.0.1 essentials ZIP does not include libsoxr and failed
+the required SoXR model-input conversion gate.
+Decision: Pin BtbN build n8.0.1-66-g27b8d1a017-20260228 from the immutable monthly release tag
+autobuild-2026-02-28-12-59. Use the static LGPL-3.0 ZIP whose configuration reports
+--enable-libsoxr, and bump the bootstrap compatibility version so the rejected runtime cannot be
+reused.
+Consequences: The verified generated-audio gate covers model conversion, identity and cancellation
+residuals, source-rate output, and output inspection. BtbN targets Windows 10 22H2 and newer, and
+its two-year monthly-release retention requires repinning before February 2028.
 ```
 
 ---
