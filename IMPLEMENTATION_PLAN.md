@@ -2158,10 +2158,10 @@ This phase proves the complete GUI lifecycle before downloads and model work beg
   dependencies, including `einops`, `beartype`, and `rotary-embedding-torch`.
 - [x] Define version-matched Torch and torchaudio in a `cuda` extra mapped to one fixed, explicit
   PyTorch CUDA index through `tool.uv.sources`.
-- [ ] Verify from a clean environment that no `uv pip install --reinstall`, `uv add`, or
+- [x] Verify from a clean environment that no `uv pip install --reinstall`, `uv add`, or
   `--no-sync` repair step is needed.
 - [x] Generate and commit `uv.lock`.
-- [ ] Add a build backend and verify a non-editable install contains the worker package.
+- [x] Add a build backend and verify a non-editable install contains the worker package.
 - [x] Add the worker package and CLI.
 - [x] Add request validation.
 - [x] Add JSON Lines protocol utilities.
@@ -2206,9 +2206,9 @@ This phase proves the complete GUI lifecycle before downloads and model work beg
 - [x] Add `worker/vendor/UPSTREAM.md` with repository URL, full commit, copy date, file inventory,
   dependency audit, and ordered local patches.
 - [x] Add the exact Kimberley configuration from the same pinned MSST snapshot and record its hash.
-- [ ] Verify the non-editable worker install contains the vendored MSST package and required
+- [x] Verify the non-editable worker install contains the vendored MSST package and required
   configuration resources.
-- [ ] Re-run the clean dependency audit and regenerate `uv.lock` if the copied import closure
+- [x] Re-run the clean dependency audit and regenerate `uv.lock` if the copied import closure
   differs from the Phase 7 audit.
 - [x] Add a repeatable vendor drift/patch check.
 - [x] Implement single-file inference wrapper.
