@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "bootstrapVersion": "2026.07.30.1",
+  "compatibleAppVersions": ">=0.1.0,<0.2.0",
+  "platform": {
+    "os": "windows",
+    "architecture": "x86_64"
+  },
+  "python": {
+    "minorVersion": "3.11",
+    "managedOnly": true
+  },
+  "uv": {
+    "version": "0.12.0",
+    "target": "x86_64-pc-windows-msvc",
+    "archiveUrl": "https://github.com/astral-sh/uv/releases/download/0.12.0/uv-x86_64-pc-windows-msvc.zip",
+    "checksumUrl": "https://github.com/astral-sh/uv/releases/download/0.12.0/uv-x86_64-pc-windows-msvc.zip.sha256",
+    "archiveSha256": "68200e25de594df92387186bbfb9d9df606ec1d87efaa0ae0c7f690970e53db6",
+    "archiveSizeBytes": 18813141,
+    "embeddedExecutablePath": "bin/uv.exe",
+    "embeddedExecutableSha256": "268cd62b99395eb53825795518e067e4b27ec4b445175df343824689f307c807",
+    "embeddedExecutableSizeBytes": 47514624,
+    "licenses": [
+      "licenses/UV_LICENSE_MIT.txt",
+      "licenses/UV_LICENSE_APACHE.txt"
+    ]
+  },
+  "worker": {
+    "projectPath": "worker",
+    "lockFile": "worker/uv.lock",
+    "pythonMinorVersion": "3.11",
+    "productionSyncArguments": [
+      "sync",
+      "--locked",
+      "--no-dev",
+      "--extra",
+      "cuda",
+      "--no-editable",
+      "--managed-python",
+      "--no-python-downloads"
+    ],
+    "cudaProfile": {
+      "indexUrl": "https://download.pytorch.org/whl/cu124",
+      "torchVersion": "2.6.0+cu124",
+      "torchaudioVersion": "2.6.0+cu124"
+    }
+  },
+  "ffmpeg": {
+    "version": "8.0.1",
+    "provider": "Gyan.D FFmpeg Builds",
+    "providerPageUrl": "https://www.gyan.dev/ffmpeg/builds/",
+    "archiveUrl": "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-8.0.1-essentials_build.zip",
+    "checksumUrl": "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-8.0.1-essentials_build.zip.sha256",
+    "archiveSha256": "e2aaeaa0fdbc397d4794828086424d4aaa2102cef1fb6874f6ffd29c0b88b673",
+    "archiveSizeBytes": 106259850,
+    "archiveRoot": "ffmpeg-8.0.1-essentials_build",
+    "ffmpegPath": "bin/ffmpeg.exe",
+    "ffprobePath": "bin/ffprobe.exe",
+    "licenseClassification": "GPL-3.0",
+    "licensePath": "LICENSE",
+    "embeddedLicensePath": "licenses/FFMPEG_GPL-3.0.txt"
+  },
+  "model": {
+    "repository": "https://huggingface.co/KimberleyJSN/melbandroformer",
+    "revision": "ac9b0614ab3cd7f77219e18ba494dfd93956c348",
+    "fileName": "MelBandRoformer.ckpt",
+    "downloadUrl": "https://huggingface.co/KimberleyJSN/melbandroformer/resolve/ac9b0614ab3cd7f77219e18ba494dfd93956c348/MelBandRoformer.ckpt",
+    "sha256": "87201f4d31afb5bc79993230fc49446918425574db48c01c405e44f365c7559e",
+    "sizeBytes": 913106900,
+    "licenseClassification": "MIT",
+    "noticePath": "licenses/MODEL_NOTICE.md"
+  },
+  "estimates": {
+    "downloadBytes": 5000000000,
+    "installedBytes": 9000000000,
+    "minimumFreeBytes": 12000000000
+  }
+}

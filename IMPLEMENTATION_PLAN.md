@@ -2134,7 +2134,7 @@ This phase proves the complete GUI lifecycle before downloads and model work beg
 - [ ] Implement ZIP extraction with path traversal protection.
 - [ ] Install the fixed FFmpeg archive into a versioned directory.
 - [ ] Validate `ffmpeg -version` and `ffprobe -version`.
-- [ ] Record the FFmpeg build version and license files.
+- [x] Record the FFmpeg build version and license files.
 - [ ] Add a small local HTTP test fixture or mocked downloader test only for core resume/hash behavior.
 
 ### Acceptance criteria
@@ -2439,11 +2439,11 @@ Keep this phase intentionally small.
   licenses; do not configure them as Tauri `bundle.resources` or external sidecars.
 - [ ] Add build and extraction tests for entry hashes, path traversal, duplicate paths, size
   limits, reparse points, and corrupted payloads.
-- [ ] Ensure release manifest has no placeholders.
-- [ ] Include third-party license files.
+- [x] Ensure release manifest has no placeholders.
+- [x] Include third-party license files.
 - [ ] Add an in-app open-source licenses view backed by the embedded/extracted notices.
-- [ ] Confirm FFmpeg build license obligations.
-- [ ] Confirm model attribution and revision.
+- [x] Confirm FFmpeg build license obligations.
+- [x] Confirm model attribution and revision.
 - [ ] Build the raw Windows executable with `pnpm tauri build --no-bundle`.
 - [ ] Copy only `soufmer.exe` to a clean directory and verify that no sibling file is required.
 - [ ] Test the portable executable on a clean Windows user profile or VM with system WebView2.
@@ -2759,17 +2759,17 @@ Keep it user/developer oriented:
 
 Before producing a public build:
 
-- [ ] Select uv binary version.
-- [ ] Verify uv binary source.
-- [ ] Calculate uv SHA-256.
-- [ ] Verify the committed lockfile with the exact uv binary embedded for release.
-- [ ] Select FFmpeg build.
-- [ ] Verify FFmpeg license type.
-- [ ] Record FFmpeg version.
-- [ ] Calculate archive SHA-256.
-- [ ] Pin model Hugging Face revision.
-- [ ] Archive the model card/license state from that exact revision.
-- [ ] Calculate model SHA-256.
+- [x] Select uv binary version.
+- [x] Verify uv binary source.
+- [x] Calculate uv SHA-256.
+- [x] Verify the committed lockfile with the exact uv binary embedded for release.
+- [x] Select FFmpeg build.
+- [x] Verify FFmpeg license type.
+- [x] Record FFmpeg version.
+- [x] Calculate archive SHA-256.
+- [x] Pin model Hugging Face revision.
+- [x] Archive the model card/license state from that exact revision.
+- [x] Calculate model SHA-256.
 - [x] Pin MSST commit.
 - [x] Verify vendored file hashes, upstream MIT text, and ordered patch set.
 - [x] Select and record the fixed PyTorch CUDA index plus matching Torch/torchaudio versions.
@@ -2778,7 +2778,7 @@ Before producing a public build:
 - [ ] Confirm the self-test reports the expected CUDA build suffix and runs a tiny CUDA operation.
 - [ ] Run worker self-test from a clean `%LOCALAPPDATA%\soufmer\` runtime.
 - [ ] Replace zero download/install/disk estimates with measured release values.
-- [ ] Confirm no manifest placeholder remains.
+- [x] Confirm no manifest placeholder remains.
 - [ ] Confirm estimated download and disk size displayed by the UI.
 
 ---
