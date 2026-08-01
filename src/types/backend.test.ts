@@ -3,6 +3,7 @@ import {
   backendEventSchema,
   diagnosticReportSchema,
   initializationProgressSchema,
+  licenseNoticesSchema,
   readyEnvironmentSchema,
   taskAcknowledgementSchema,
 } from "./backend";
@@ -39,5 +40,14 @@ describe("backend event schemas", () => {
   it("accepts only nonempty persisted diagnostic reports", () => {
     expect(diagnosticReportSchema.safeParse("runtime log").success).toBe(true);
     expect(diagnosticReportSchema.safeParse("").success).toBe(false);
+  });
+
+  it("requires strict, nonempty embedded license notices", () => {
+    const notice = { id: "uv-mit", title: "uv — MIT License", text: "MIT License" };
+
+    expect(licenseNoticesSchema.safeParse([notice]).success).toBe(true);
+    expect(licenseNoticesSchema.safeParse([]).success).toBe(false);
+    expect(licenseNoticesSchema.safeParse([{ ...notice, source: "runtime" }]).success).toBe(false);
+    expect(licenseNoticesSchema.safeParse([{ ...notice, text: "" }]).success).toBe(false);
   });
 });

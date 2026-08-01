@@ -2340,7 +2340,7 @@ This phase proves the complete GUI lifecycle before downloads and model work beg
 - [x] Run the real initialization state machine before processing is enabled.
 - [x] Reuse the progress dialog.
 - [x] Enable batch submission only after successful initialization.
-- [ ] Implement retry after recoverable initialization failure.
+- [x] Implement retry after recoverable initialization failure.
 - [x] Implement repair behavior for incomplete runtime state.
 
 ### Acceptance criteria
@@ -2442,7 +2442,7 @@ Keep this phase intentionally small.
   limits, reparse points, and corrupted payloads.
 - [x] Ensure release manifest has no placeholders.
 - [x] Include third-party license files.
-- [ ] Add an in-app open-source licenses view backed by the embedded/extracted notices.
+- [x] Add an in-app open-source licenses view backed by the embedded/extracted notices.
 - [x] Confirm FFmpeg build license obligations.
 - [x] Confirm model attribution and revision.
 - [ ] Build the raw Windows executable with `pnpm tauri build --no-bundle`.

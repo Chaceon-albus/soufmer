@@ -7,6 +7,9 @@ const progressValueSchema = z.discriminatedUnion("kind", [
 
 export const backendErrorSchema = z.object({ code: z.string(), stage: z.string(), messageKey: z.string(), recoverable: z.boolean(), diagnosticId: z.string(), itemPath: z.string().optional() });
 export const diagnosticReportSchema = z.string().min(1);
+export const licenseNoticeSchema = z.object({ id: z.string().min(1), title: z.string().min(1), text: z.string().min(1) }).strict();
+export const licenseNoticesSchema = z.array(licenseNoticeSchema).min(1);
+export type LicenseNotice = z.infer<typeof licenseNoticeSchema>;
 export const taskAcknowledgementSchema = z.object({ taskId: z.string().min(1), acceptedAt: z.string().min(1) });
 export const readyEnvironmentSchema = z.object({ type: z.literal("ready"), runtimeVersion: z.string(), modelVersion: z.string(), ffmpegVersion: z.string() });
 export const environmentStatusSchema = z.discriminatedUnion("type", [z.object({ type: z.literal("notInstalled"), estimatedDownloadBytes: z.number().optional(), estimatedDiskBytes: z.number().optional() }), z.object({ type: z.literal("installing"), runtimeVersion: z.string() }), readyEnvironmentSchema, z.object({ type: z.literal("repairRequired"), reasonCode: z.string() }), z.object({ type: z.literal("unsupported"), reasonCode: z.string() })]);

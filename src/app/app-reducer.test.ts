@@ -55,6 +55,46 @@ describe("appReducer", () => {
       environment: readyEnvironment,
     });
   });
+  it("preserves a pending batch request across a recoverable initialization retry", () => {
+    const initializationProgress = {
+      runtimeVersion: "1.0.0",
+      stepIndex: 1,
+      stepCount: 7,
+      stepId: "checkingSystem" as const,
+      overall: { kind: "determinate" as const, fraction: 0.1 },
+      current: { kind: "indeterminate" as const },
+    };
+    const readyEnvironment = { type: "ready" as const, runtimeVersion: "1.0.0", modelVersion: "model", ffmpegVersion: "ffmpeg" };
+    const error = { code: "ENV_DOWNLOAD_FAILED", stage: "runtime", messageKey: "error.environmentDownloadFailed", recoverable: true, diagnosticId: "diagnostic-1" };
+    let state: AppState = { type: "validating", request, environment: mockEnvironment, settings: defaultSettings };
+
+    state = appReducer(state, { type: "validationNeedsInitialization", environment: { type: "notInstalled" } });
+    state = appReducer(state, { type: "failed", error });
+    expect(state).toMatchObject({ type: "failed", initializationRequest: request });
+
+    state = appReducer(state, { type: "initializationRetryRequested" });
+    expect(state).toMatchObject({ type: "awaitingInitializationConsent", request });
+    state = appReducer(state, { type: "initializationAccepted", taskId: "runtime-retry", progress: initializationProgress });
+    state = appReducer(state, { type: "eventFailed", taskId: "runtime-retry", error });
+    expect(state).toMatchObject({ type: "failed", initializationRequest: request });
+
+    state = appReducer(state, { type: "initializationRetryRequested" });
+    state = appReducer(state, { type: "initializationAccepted", taskId: "runtime-retry-2", progress: initializationProgress });
+    state = appReducer(state, { type: "initializationCompleted", taskId: "runtime-retry-2", sequence: 1, environment: readyEnvironment });
+
+    expect(state).toMatchObject({ type: "validating", request, environment: readyEnvironment });
+  });
+  it("does not offer a retry transition for a non-recoverable initialization failure", () => {
+    const state: AppState = {
+      type: "failed",
+      error: { code: "ENV_HASH_MISMATCH", stage: "runtime", messageKey: "error.environmentHashMismatch", recoverable: false, diagnosticId: "diagnostic-2" },
+      environment: mockEnvironment,
+      settings: defaultSettings,
+      initializationRequest: request,
+    };
+
+    expect(appReducer(state, { type: "initializationRetryRequested" })).toBe(state);
+  });
   it("returns initialization cancellation to idle and only fabricates a batch result as a fallback", () => {
     const initializationProgress = {
       runtimeVersion: "1.0.0",
