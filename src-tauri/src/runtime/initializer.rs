@@ -221,10 +221,10 @@ pub fn initialize(
     );
     emit_progress(
         &emit,
-        update(
+        begin_update(
             InitializationStep::PreparingTools,
             0.02,
-            "validated embedded bootstrap",
+            "preparing verified audio tools",
         ),
     );
     let runtime_id = format!(
@@ -909,11 +909,17 @@ fn capture_output(
             Some(PathBuf::from(directory).join(format!("runtime-{}.stderr.log", Uuid::new_v4())));
     }
     let on_stderr_line: Arc<dyn Fn(String) + Send + Sync> = match activity {
-        Some((step, emit)) => Arc::new(move |line| {
-            if let Some(activity) = parse_uv_activity(step, &line) {
-                emit(InitEvent::Activity(activity));
-            }
-        }),
+        Some((step, emit)) => {
+            let tracker = std::sync::Mutex::new(UvActivityTracker::new(step));
+            Arc::new(move |line| {
+                let Ok(mut tracker) = tracker.lock() else {
+                    return;
+                };
+                if let Some(activity) = tracker.consume(&line) {
+                    emit(InitEvent::Activity(activity));
+                }
+            })
+        }
         None => Arc::new(|_| {}),
     };
     ProcessRunner::run_streaming(spec, cancellation.clone(), Arc::new(|_| {}), on_stderr_line)
@@ -947,116 +953,125 @@ fn emit_activity(
     }));
 }
 
-fn parse_uv_activity(
+#[derive(Debug)]
+struct UvActivityTracker {
     step_id: InitializationStep,
-    raw_line: &str,
-) -> Option<InitializationActivity> {
-    let line = strip_terminal_formatting(raw_line);
-    let line = line.trim();
-    if line.is_empty() {
-        return None;
-    }
+    downloaded_packages: u64,
+}
 
-    if line
-        .strip_prefix("Downloading ")
-        .and_then(first_safe_package_token)
-        .is_some()
-    {
-        return Some(activity(
+impl UvActivityTracker {
+    fn new(step_id: InitializationStep) -> Self {
+        Self {
             step_id,
-            InitializationActivityLevel::Download,
-            "downloadingPackage",
-            None,
-            None,
-        ));
-    }
-    if line
-        .strip_prefix("Downloaded ")
-        .and_then(first_safe_package_token)
-        .is_some()
-    {
-        return Some(activity(
-            step_id,
-            InitializationActivityLevel::Download,
-            "downloadedPackage",
-            None,
-            None,
-        ));
-    }
-    if line
-        .strip_prefix('+')
-        .map(str::trim_start)
-        .and_then(first_safe_package_token)
-        .is_some()
-    {
-        return Some(activity(
-            step_id,
-            InitializationActivityLevel::Install,
-            "installedPackage",
-            None,
-            None,
-        ));
-    }
-    if let Some(version) = line
-        .strip_prefix("Installed Python ")
-        .and_then(first_safe_version_token)
-    {
-        return Some(activity(
-            step_id,
-            InitializationActivityLevel::Install,
-            "installedPython",
-            Some(format!("Python {version}")),
-            None,
-        ));
-    }
-
-    for (prefix, message, level) in [
-        (
-            "Resolving ",
-            "resolvingPackages",
-            InitializationActivityLevel::Status,
-        ),
-        (
-            "Resolved ",
-            "resolvedPackages",
-            InitializationActivityLevel::Status,
-        ),
-        (
-            "Preparing ",
-            "preparingPackages",
-            InitializationActivityLevel::Install,
-        ),
-        (
-            "Prepared ",
-            "preparedPackages",
-            InitializationActivityLevel::Install,
-        ),
-        (
-            "Installing ",
-            "installingPackages",
-            InitializationActivityLevel::Install,
-        ),
-        (
-            "Installed ",
-            "installedPackages",
-            InitializationActivityLevel::Install,
-        ),
-        (
-            "Auditing ",
-            "auditingPackages",
-            InitializationActivityLevel::Status,
-        ),
-        (
-            "Audited ",
-            "auditedPackages",
-            InitializationActivityLevel::Status,
-        ),
-    ] {
-        if let Some(count) = line.strip_prefix(prefix).and_then(package_count) {
-            return Some(activity(step_id, level, message, None, Some(count)));
+            downloaded_packages: 0,
         }
     }
-    None
+
+    fn consume(&mut self, raw_line: &str) -> Option<InitializationActivity> {
+        let line = strip_terminal_formatting(raw_line);
+        let line = line.trim();
+        if line.is_empty() {
+            return None;
+        }
+
+        if line
+            .strip_prefix("Downloading ")
+            .and_then(first_safe_package_token)
+            .is_some()
+        {
+            return Some(activity(
+                self.step_id,
+                InitializationActivityLevel::Download,
+                "downloadingPackage",
+                None,
+                None,
+                None,
+            ));
+        }
+        if line
+            .strip_prefix("Downloaded ")
+            .and_then(first_safe_package_token)
+            .is_some()
+        {
+            self.downloaded_packages = self.downloaded_packages.saturating_add(1);
+            return Some(activity(
+                self.step_id,
+                InitializationActivityLevel::Download,
+                "downloadedPackage",
+                None,
+                Some(self.downloaded_packages),
+                None,
+            ));
+        }
+        if let Some(version) = line
+            .strip_prefix("Installed Python ")
+            .and_then(first_safe_version_token)
+        {
+            return Some(activity(
+                self.step_id,
+                InitializationActivityLevel::Install,
+                "installedPython",
+                Some(format!("Python {version}")),
+                None,
+                None,
+            ));
+        }
+
+        for (prefix, message, level) in [
+            (
+                "Resolving ",
+                "resolvingPackages",
+                InitializationActivityLevel::Status,
+            ),
+            (
+                "Resolved ",
+                "resolvedPackages",
+                InitializationActivityLevel::Status,
+            ),
+            (
+                "Preparing ",
+                "preparingPackages",
+                InitializationActivityLevel::Install,
+            ),
+            (
+                "Prepared ",
+                "preparedPackages",
+                InitializationActivityLevel::Install,
+            ),
+            (
+                "Installing ",
+                "installingPackages",
+                InitializationActivityLevel::Install,
+            ),
+            (
+                "Installed ",
+                "installedPackages",
+                InitializationActivityLevel::Install,
+            ),
+            (
+                "Auditing ",
+                "auditingPackages",
+                InitializationActivityLevel::Status,
+            ),
+            (
+                "Audited ",
+                "auditedPackages",
+                InitializationActivityLevel::Status,
+            ),
+        ] {
+            if let Some(count) = line.strip_prefix(prefix).and_then(package_count) {
+                return Some(activity(
+                    self.step_id,
+                    level,
+                    message,
+                    None,
+                    Some(count),
+                    Some(count),
+                ));
+            }
+        }
+        None
+    }
 }
 
 fn activity(
@@ -1065,6 +1080,7 @@ fn activity(
     message: &str,
     package_name: Option<String>,
     completed_units: Option<u64>,
+    total_units: Option<u64>,
 ) -> InitializationActivity {
     InitializationActivity {
         step_id,
@@ -1072,7 +1088,7 @@ fn activity(
         message: message.into(),
         package_name,
         completed_units,
-        total_units: None,
+        total_units,
     }
 }
 
@@ -1358,6 +1374,15 @@ fn update(step: InitializationStep, fraction: f64, detail: &'static str) -> Init
         detail,
     }
 }
+fn begin_update(step: InitializationStep, fraction: f64, detail: &'static str) -> InitUpdate {
+    InitUpdate {
+        step,
+        current: ProgressValue::Indeterminate,
+        fraction,
+        bytes: None,
+        detail,
+    }
+}
 fn speed(bytes: u64, start: Instant) -> u64 {
     (bytes as f64 / start.elapsed().as_secs_f64().max(0.001)) as u64
 }
@@ -1427,7 +1452,7 @@ impl Drop for RuntimeMutex {
 #[cfg(test)]
 mod tests {
     use super::{
-        Entry, embedded_manifest_bytes, parse_self_test_event, parse_uv_activity,
+        Entry, UvActivityTracker, begin_update, embedded_manifest_bytes, parse_self_test_event,
         private_environment, resolve_active_runtime, safe_zip_path, verify_archive_descriptor,
         verify_extracted_entry_descriptor,
     };
@@ -1486,11 +1511,10 @@ mod tests {
 
     #[test]
     fn parses_only_sanitized_recognized_uv_activity() {
-        let downloading = parse_uv_activity(
-            InitializationStep::SyncingEnvironment,
-            "\u{1b}[2KDownloading torch (2.4 GiB)\u{1b}[0m",
-        )
-        .unwrap();
+        let mut tracker = UvActivityTracker::new(InitializationStep::SyncingEnvironment);
+        let downloading = tracker
+            .consume("\u{1b}[2KDownloading torch (2.4 GiB)\u{1b}[0m")
+            .unwrap();
         assert_eq!(downloading.message, "downloadingPackage");
         assert_eq!(downloading.package_name, None);
         assert!(matches!(
@@ -1498,33 +1522,31 @@ mod tests {
             InitializationActivityLevel::Download
         ));
 
-        let resolved = parse_uv_activity(
-            InitializationStep::SyncingEnvironment,
-            "Resolved 72 packages in 1.2s",
-        )
-        .unwrap();
+        let first_download = tracker.consume("Downloaded torch").unwrap();
+        let second_download = tracker.consume("Downloaded torchaudio").unwrap();
+        assert_eq!(first_download.completed_units, Some(1));
+        assert_eq!(second_download.completed_units, Some(2));
+        assert_eq!(second_download.total_units, None);
+
+        let resolved = tracker.consume("Resolved 72 packages in 1.2s").unwrap();
         assert_eq!(resolved.message, "resolvedPackages");
         assert_eq!(resolved.completed_units, Some(72));
+        assert_eq!(resolved.total_units, Some(72));
 
-        let installed = parse_uv_activity(
-            InitializationStep::SyncingEnvironment,
-            "+ torchaudio==2.6.0+cu124",
-        )
-        .unwrap();
-        assert_eq!(installed.message, "installedPackage");
-        assert_eq!(installed.package_name, None);
+        let installed = tracker.consume("Installed 45 packages in 1.2s").unwrap();
+        assert_eq!(installed.message, "installedPackages");
+        assert_eq!(installed.completed_units, Some(45));
+        assert_eq!(installed.total_units, Some(45));
+        assert!(tracker.consume("+ torchaudio==2.6.0+cu124").is_none());
 
-        let credential_shaped = parse_uv_activity(
-            InitializationStep::SyncingEnvironment,
-            "Downloading ghp_secretToken123",
-        )
-        .unwrap();
+        let credential_shaped = tracker.consume("Downloading ghp_secretToken123").unwrap();
         assert_eq!(credential_shaped.message, "downloadingPackage");
         assert_eq!(credential_shaped.package_name, None);
     }
 
     #[test]
     fn rejects_untrusted_or_path_bearing_uv_output() {
+        let mut tracker = UvActivityTracker::new(InitializationStep::SyncingEnvironment);
         for line in [
             "Traceback (most recent call last):",
             "Authorization: Bearer secret",
@@ -1534,10 +1556,22 @@ mod tests {
             "arbitrary terminal output",
         ] {
             assert!(
-                parse_uv_activity(InitializationStep::SyncingEnvironment, line).is_none(),
+                tracker.consume(line).is_none(),
                 "{line}"
             );
         }
+    }
+
+    #[test]
+    fn preparing_tools_starts_without_precompleted_current_progress() {
+        let update = begin_update(
+            InitializationStep::PreparingTools,
+            0.02,
+            "preparing verified audio tools",
+        );
+
+        assert!(matches!(update.current, crate::domain::ProgressValue::Indeterminate));
+        assert_eq!(update.fraction, 0.02);
     }
 
     #[test]
