@@ -5,8 +5,12 @@ use std::{
     io::{Cursor, Read, Write},
     os::windows::{ffi::OsStrExt, fs::MetadataExt},
     path::{Component, Path, PathBuf},
-    sync::Arc,
-    time::Instant,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    thread,
+    time::{Duration, Instant},
 };
 
 use serde::{Deserialize, Serialize};
@@ -342,14 +346,15 @@ fn install_runtime(
             .iter()
             .map(String::as_str),
     );
-    run(
+    run_monitored_uv_sync(
         &uv,
         &args,
         &runtime.join("worker"),
         &environment,
+        paths,
+        runtime,
         cancellation,
-        ErrorCode::PythonSyncFailed,
-        Some((InitializationStep::SyncingEnvironment, Arc::clone(emit))),
+        emit,
     )?;
     emit_progress(
         emit,
@@ -868,6 +873,133 @@ fn run(
 ) -> Result<(), AppError> {
     run_output(exe, args, cwd, environment, cancellation, code, activity).map(|_| ())
 }
+
+#[derive(Clone, Debug, Default)]
+struct SyncByteState {
+    dynamic_total_bytes: u64,
+    completed_download_bytes: u64,
+}
+
+fn active_handle_file_size(dir: &Path) -> u64 {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return 0;
+    };
+    let mut total = 0;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Ok(file_type) = entry.file_type() else {
+            continue;
+        };
+        if file_type.is_file() {
+            if let Ok(file) = fs::OpenOptions::new().read(true).open(&path) {
+                if let Ok(metadata) = file.metadata() {
+                    total += metadata.len();
+                }
+            }
+        } else if file_type.is_dir() {
+            total += active_handle_file_size(&path);
+        }
+    }
+    total
+}
+
+fn run_monitored_uv_sync(
+    uv: &Path,
+    args: &[&str],
+    cwd: &Path,
+    environment: &[(OsString, OsString)],
+    paths: &AppPaths,
+    runtime: &Path,
+    cancellation: &CancellationToken,
+    emit: &InitEventSink,
+) -> Result<(), AppError> {
+    let uv_cache_dir = paths.uv_cache();
+    let temp_dir = runtime.join("tmp");
+    let byte_state = Arc::new(std::sync::Mutex::new(SyncByteState::default()));
+
+    let stop_signal = Arc::new(AtomicBool::new(false));
+    let stop = Arc::clone(&stop_signal);
+    let emit_clone = Arc::clone(emit);
+    let uv_cache_clone = uv_cache_dir.clone();
+    let temp_clone = temp_dir.clone();
+    let state_clone = Arc::clone(&byte_state);
+
+    let monitor_handle = thread::spawn(move || {
+        let start_time = Instant::now();
+        let mut last_time = start_time;
+        let mut last_bytes = 0_u64;
+        let mut smoothed_speed = 0_u64;
+
+        while !stop.load(Ordering::Acquire) {
+            thread::sleep(Duration::from_millis(250));
+            if stop.load(Ordering::Acquire) {
+                break;
+            }
+
+            let active_bytes =
+                active_handle_file_size(&uv_cache_clone) + active_handle_file_size(&temp_clone);
+            let (completed_base, dynamic_total) = {
+                let Ok(state) = state_clone.lock() else {
+                    continue;
+                };
+                (state.completed_download_bytes, state.dynamic_total_bytes)
+            };
+
+            let estimated_total = dynamic_total.max(2_600_000_000);
+            let current_completed = (completed_base + active_bytes).min(estimated_total);
+
+            let now = Instant::now();
+            let elapsed_secs = now.duration_since(last_time).as_secs_f64();
+
+            if elapsed_secs >= 0.2 {
+                let instant_speed = if elapsed_secs > 0.0 {
+                    ((current_completed.saturating_sub(last_bytes)) as f64 / elapsed_secs) as u64
+                } else {
+                    0
+                };
+                smoothed_speed = if smoothed_speed == 0 {
+                    instant_speed
+                } else {
+                    ((smoothed_speed as f64 * 0.7) + (instant_speed as f64 * 0.3)) as u64
+                };
+                last_bytes = current_completed;
+                last_time = now;
+            }
+
+            let update = download_update(
+                InitializationStep::SyncingEnvironment,
+                current_completed,
+                estimated_total,
+                0.15,
+                0.45,
+                smoothed_speed,
+                "synchronizing locked CUDA environment",
+            );
+            emit_progress(&emit_clone, update);
+        }
+    });
+
+    let run_result = capture_output(
+        uv,
+        args,
+        cwd,
+        environment,
+        cancellation,
+        ErrorCode::PythonSyncFailed,
+        Some((
+            InitializationStep::SyncingEnvironment,
+            Arc::clone(emit),
+            Some(byte_state),
+        )),
+    )
+    .map(|_| ());
+
+    stop_signal.store(true, Ordering::Release);
+    let _ = monitor_handle.join();
+
+    run_result
+}
+
 fn run_output(
     exe: &Path,
     args: &[&str],
@@ -877,6 +1009,7 @@ fn run_output(
     code: ErrorCode,
     activity: Option<(InitializationStep, InitEventSink)>,
 ) -> Result<crate::process::ProcessOutput, AppError> {
+    let activity = activity.map(|(step, emit)| (step, emit, None));
     let result = capture_output(exe, args, cwd, environment, cancellation, code, activity)?;
     if result.exit_code == Some(0) {
         Ok(result)
@@ -892,7 +1025,11 @@ fn capture_output(
     environment: &[(OsString, OsString)],
     cancellation: &CancellationToken,
     code: ErrorCode,
-    activity: Option<(InitializationStep, InitEventSink)>,
+    activity: Option<(
+        InitializationStep,
+        InitEventSink,
+        Option<Arc<std::sync::Mutex<SyncByteState>>>,
+    )>,
 ) -> Result<crate::process::ProcessOutput, AppError> {
     let mut spec = ProcessSpec::new(exe);
     spec.arguments = args.iter().map(OsString::from).collect();
@@ -906,8 +1043,8 @@ fn capture_output(
             Some(PathBuf::from(directory).join(format!("runtime-{}.stderr.log", Uuid::new_v4())));
     }
     let on_stderr_line: Arc<dyn Fn(String) + Send + Sync> = match activity {
-        Some((step, emit)) => {
-            let tracker = std::sync::Mutex::new(UvActivityTracker::new(step));
+        Some((step, emit, byte_state)) => {
+            let tracker = std::sync::Mutex::new(UvActivityTracker::new(step, byte_state));
             Arc::new(move |line| {
                 let Ok(mut tracker) = tracker.lock() else {
                     return;
@@ -956,13 +1093,24 @@ fn emit_activity(
 struct UvActivityTracker {
     step_id: InitializationStep,
     downloaded_packages: u64,
+    installed_packages: u64,
+    total_packages: Option<u64>,
+    byte_state: Option<Arc<std::sync::Mutex<SyncByteState>>>,
+    active_download_sizes: BTreeMap<String, u64>,
 }
 
 impl UvActivityTracker {
-    fn new(step_id: InitializationStep) -> Self {
+    fn new(
+        step_id: InitializationStep,
+        byte_state: Option<Arc<std::sync::Mutex<SyncByteState>>>,
+    ) -> Self {
         Self {
             step_id,
             downloaded_packages: 0,
+            installed_packages: 0,
+            total_packages: None,
+            byte_state,
+            active_download_sizes: BTreeMap::new(),
         }
     }
 
@@ -979,6 +1127,14 @@ impl UvActivityTracker {
             let package_size_bytes = package_name
                 .as_ref()
                 .and_then(|_| package_size_bytes(value));
+            if let (Some(name), Some(size)) = (&package_name, package_size_bytes) {
+                self.active_download_sizes.insert(name.clone(), size);
+                if let Some(state) = &self.byte_state {
+                    if let Ok(mut state) = state.lock() {
+                        state.dynamic_total_bytes = state.dynamic_total_bytes.saturating_add(size);
+                    }
+                }
+            }
             return Some(activity(
                 self.step_id,
                 InitializationActivityLevel::Download,
@@ -986,6 +1142,7 @@ impl UvActivityTracker {
                 ActivityDetails {
                     package_name,
                     package_size_bytes,
+                    total_units: self.total_packages,
                     ..ActivityDetails::default()
                 },
             ));
@@ -993,6 +1150,16 @@ impl UvActivityTracker {
         if let Some(value) = line.strip_prefix("Downloaded ") {
             let token = first_safe_package_token(value)?;
             let package_name = safe_package_display_name(&token);
+            if let Some(name) = &package_name {
+                if let Some(size) = self.active_download_sizes.remove(name) {
+                    if let Some(state) = &self.byte_state {
+                        if let Ok(mut state) = state.lock() {
+                            state.completed_download_bytes =
+                                state.completed_download_bytes.saturating_add(size);
+                        }
+                    }
+                }
+            }
             self.downloaded_packages = self.downloaded_packages.saturating_add(1);
             return Some(activity(
                 self.step_id,
@@ -1001,6 +1168,7 @@ impl UvActivityTracker {
                 ActivityDetails {
                     package_name,
                     completed_units: Some(self.downloaded_packages),
+                    total_units: self.total_packages,
                     ..ActivityDetails::default()
                 },
             ));
@@ -1023,6 +1191,7 @@ impl UvActivityTracker {
         if let Some((package_name, package_version)) =
             line.strip_prefix("+ ").and_then(safe_locked_requirement)
         {
+            self.installed_packages = self.installed_packages.saturating_add(1);
             return Some(activity(
                 self.step_id,
                 InitializationActivityLevel::Install,
@@ -1030,6 +1199,8 @@ impl UvActivityTracker {
                 ActivityDetails {
                     package_name: Some(package_name),
                     package_version: Some(package_version),
+                    completed_units: Some(self.installed_packages),
+                    total_units: self.total_packages,
                     ..ActivityDetails::default()
                 },
             ));
@@ -1078,6 +1249,9 @@ impl UvActivityTracker {
             ),
         ] {
             if let Some(count) = line.strip_prefix(prefix).and_then(package_count) {
+                if message == "resolvedPackages" || message == "installingPackages" {
+                    self.total_packages = Some(count);
+                }
                 return Some(activity(
                     self.step_id,
                     level,
@@ -1166,14 +1340,17 @@ fn package_size_bytes(value: &str) -> Option<u64> {
     let unit_index = size.find(|character: char| character.is_ascii_alphabetic())?;
     let (number, unit) = size.split_at(unit_index);
     let number = number.trim().parse::<f64>().ok()?;
-    let multiplier = match unit.trim() {
-        "B" => 1.0,
-        "KB" => 1_000.0,
-        "KiB" => 1_024.0,
-        "MB" => 1_000_000.0,
-        "MiB" => 1_048_576.0,
-        "GB" => 1_000_000_000.0,
-        "GiB" => 1_073_741_824.0,
+    let unit_normalized = unit.trim().to_ascii_lowercase();
+    let multiplier = match unit_normalized.as_str() {
+        "b" | "byte" | "bytes" => 1.0,
+        "kb" | "k" => 1_000.0,
+        "kib" => 1_024.0,
+        "mb" | "m" => 1_000_000.0,
+        "mib" => 1_048_576.0,
+        "gb" | "g" => 1_000_000_000.0,
+        "gib" => 1_073_741_824.0,
+        "tb" | "t" => 1_000_000_000_000.0,
+        "tib" => 1_099_511_627_776.0,
         _ => return None,
     };
     let bytes = number * multiplier;
@@ -1545,9 +1722,9 @@ impl Drop for RuntimeMutex {
 #[cfg(test)]
 mod tests {
     use super::{
-        Entry, UvActivityTracker, download_update, embedded_manifest_bytes, parse_self_test_event,
-        private_environment, resolve_active_runtime, safe_zip_path, verify_archive_descriptor,
-        verify_extracted_entry_descriptor,
+        Entry, UvActivityTracker, download_update, embedded_manifest_bytes, package_size_bytes,
+        parse_self_test_event, private_environment, resolve_active_runtime, safe_zip_path,
+        verify_archive_descriptor, verify_extracted_entry_descriptor,
     };
     use crate::domain::{ErrorCode, InitializationActivityLevel, InitializationStep};
     use crate::process::ProcessOutput;
@@ -1604,7 +1781,7 @@ mod tests {
 
     #[test]
     fn parses_only_sanitized_recognized_uv_activity() {
-        let mut tracker = UvActivityTracker::new(InitializationStep::SyncingEnvironment);
+        let mut tracker = UvActivityTracker::new(InitializationStep::SyncingEnvironment, None);
         let downloading = tracker
             .consume("\u{1b}[2KDownloading torch (2.4 GiB)\u{1b}[0m")
             .unwrap();
@@ -1668,8 +1845,23 @@ mod tests {
     }
 
     #[test]
+    fn robustly_parses_various_package_size_units() {
+        assert_eq!(package_size_bytes("Downloading pkg (100 B)"), Some(100));
+        assert_eq!(package_size_bytes("Downloading pkg (100 bytes)"), Some(100));
+        assert_eq!(package_size_bytes("Downloading pkg (500 KB)"), Some(500_000));
+        assert_eq!(package_size_bytes("Downloading pkg (500kB)"), Some(500_000));
+        assert_eq!(package_size_bytes("Downloading pkg (100 KiB)"), Some(102_400));
+        assert_eq!(package_size_bytes("Downloading pkg (1.5 MB)"), Some(1_500_000));
+        assert_eq!(package_size_bytes("Downloading pkg (2.6 MiB)"), Some(2_726_298));
+        assert_eq!(package_size_bytes("Downloading pkg (1.2 GB)"), Some(1_200_000_000));
+        assert_eq!(package_size_bytes("Downloading pkg (2.4 GiB)"), Some(2_576_980_378));
+        assert_eq!(package_size_bytes("Downloading pkg (1 tb)"), Some(1_000_000_000_000));
+        assert_eq!(package_size_bytes("Downloading pkg (1.5 TiB)"), Some(1_649_267_441_664));
+    }
+
+    #[test]
     fn rejects_untrusted_or_path_bearing_uv_output() {
-        let mut tracker = UvActivityTracker::new(InitializationStep::SyncingEnvironment);
+        let mut tracker = UvActivityTracker::new(InitializationStep::SyncingEnvironment, None);
         for line in [
             "Traceback (most recent call last):",
             "Authorization: Bearer secret",

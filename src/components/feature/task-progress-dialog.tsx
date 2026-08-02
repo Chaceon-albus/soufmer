@@ -7,7 +7,6 @@ import { Progress } from "@/components/ui/progress";
 import { formatBinaryBytes, formatBytes, formatDuration, formatRate } from "@/lib/format";
 import { useElapsedTime } from "@/hooks/use-elapsed-time";
 import type { BatchProgress, InitializationActivity, InitializationActivityEntry, InitializationProgress, ProgressValue } from "@/types/domain";
-import { UvTerminal } from "./uv-terminal";
 
 type Props = {
   progress: InitializationProgress | BatchProgress;
@@ -64,7 +63,6 @@ export function TaskProgressDialog({ progress, activities = [], mode, onCancel }
           <div><dt className="text-slate-600">{t("progress.downloaded")}</dt><dd className="mt-1 break-words font-medium">{formatBytes(progress.bytesCompleted)} / {formatBytes(progress.bytesTotal)}</dd></div>
           <div><dt className="text-slate-600">{t("progress.speed")}</dt><dd className="mt-1 font-medium">{formatRate(progress.bytesPerSecond)}</dd></div>
         </dl>}
-        {initializing && progress.stepId === "syncingEnvironment" && <UvTerminal activities={activities} />}
         <p className="text-sm text-slate-600">{t("progress.elapsed", { time: formatDuration(elapsed) })}</p>
       </div>
       <div className="mt-7 flex justify-end">
