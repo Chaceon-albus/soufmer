@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { CancellationConfirmationDialog } from "@/components/feature/cancellation-confirmation-dialog";
-import { Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { CompletionDialog } from "@/components/feature/completion-dialog";
 import { EnvironmentStatusCard } from "@/components/feature/environment-status";
@@ -90,19 +89,21 @@ export default function App() {
   const switchLanguage = useCallback(() => { const locale = i18n.language === "zh-CN" ? "en" : "zh-CN"; void i18n.changeLanguage(locale); if (state.type !== "booting" && state.settings) persistSettings({ ...state.settings, locale }); }, [i18n, persistSettings, state]);
 
   return <main className="h-dvh overflow-hidden bg-slate-50 text-slate-900">
-    <div className="mx-auto grid h-full max-w-4xl grid-rows-[auto_minmax(0,1fr)_auto] px-4 py-4 sm:px-6">
-      <header className="flex items-start justify-between gap-4 border-b border-slate-200 pb-3">
+    <div className="mx-auto flex h-full max-w-4xl flex-col px-4 py-4 sm:px-6">
+      <header className="flex items-start justify-between gap-4 border-b border-slate-200 pb-3 pr-2 shrink-0">
         <div className="min-w-0">
           <div className="flex items-center gap-3"><span aria-hidden className="h-6 w-1.5 rounded-full bg-gradient-to-b from-primary to-display-accent shadow-xs shadow-pink-300" /><h1 className="text-2xl font-semibold tracking-tight text-slate-900">Soufmer</h1></div>
           <p className="mt-1 max-w-xl text-sm leading-5 text-slate-600">{t("app.description")}</p>
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-1"><Button type="button" variant="ghost" size="sm" onClick={() => setLicenseOpen(true)}>{t("license.open")}</Button><Button type="button" variant="ghost" size="sm" onClick={switchLanguage}>{t("app.switchLanguage")}</Button></div>
       </header>
-      <section className="min-h-0 overflow-y-auto py-3 pr-2">
-        {idle && <Card><CardContent className="p-4"><MainForm formId={mainFormId} settings={idle.settings} onSubmit={(request: StartBatchRequest) => dispatch({ type: "startRequested", request })} onSettingsChange={persistSettings} onChooseInput={chooseInput} onChooseOutput={chooseOutputDirectory} submitDisabled={!listenersReady || idle.environment.type !== "ready"} /></CardContent></Card>}
+      <div className="min-h-0 flex-1 overflow-y-auto py-3.5 pr-2 space-y-3.5">
+        {idle && <>
+          <Card><CardContent className="p-4"><MainForm formId={mainFormId} settings={idle.settings} onSubmit={(request: StartBatchRequest) => dispatch({ type: "startRequested", request })} onSettingsChange={persistSettings} onChooseInput={chooseInput} onChooseOutput={chooseOutputDirectory} submitDisabled={!listenersReady || idle.environment.type !== "ready"} /></CardContent></Card>
+          <EnvironmentStatusCard status={idle.environment} onInitialize={requestInitialization} disabled={!listenersReady} />
+        </>}
         {import.meta.env.DEV && !isDesktopBridge() && <div className="mt-3 space-y-2"><p className="text-center text-xs text-slate-500">{t("development.browserFallback")}</p><div className="flex flex-wrap justify-center gap-2"><Button type="button" size="sm" variant="outline" onClick={() => dispatch({ type: "developmentCompleted", result: { taskId: "browser-cancelled", succeeded: 0, failed: 0, skipped: 0, outputDirectory: "", cancelled: true, items: [] } })}>{t("development.previewCancelled")}</Button><Button type="button" size="sm" variant="outline" onClick={() => dispatch({ type: "failed", error: { code: "ENV_NOT_INITIALIZED", stage: "runtime", messageKey: "error.environmentNotInitialized", recoverable: true, diagnosticId: "browser-preview" } })}>{t("development.previewError")}</Button></div></div>}
-      </section>
-      {idle && <footer className="border-t border-slate-200 pt-3"><div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"><EnvironmentStatusCard status={idle.environment} onInitialize={requestInitialization} disabled={!listenersReady} /><Button type="submit" form={mainFormId} size="lg" className="w-full sm:min-w-44 sm:w-auto" disabled={!listenersReady || idle.environment.type !== "ready"}><Sparkles className="size-4" />{t("main.start")}</Button></div></footer>}
+      </div>
     </div>
     {licenseOpen && <LicenseDialog onClose={() => setLicenseOpen(false)} />}
     {state.type === "awaitingInitializationConsent" && <InitializationConsent environment={state.environment} onAccept={beginInitialization} onDecline={dismiss} />}

@@ -2,6 +2,7 @@
 
 @theme {
   --font-sans: "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  --font-mono: Consolas, Monaco, "Cascadia Code", "Fira Code", "Courier New", monospace;
   --color-primary: #fb7299;
   --color-primary-hover: #e85b84;
   --color-primary-active: #d1436f;

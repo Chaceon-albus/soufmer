@@ -4,10 +4,10 @@ import type { InitializationActivity, InitializationActivityEntry } from "@/type
 export const UV_TERMINAL_EMPTY_MESSAGE = "Waiting for uv output...";
 
 export const UV_TERMINAL_COLORS = {
-  status: "#586e75",
-  download: "#268bd2",
-  install: "#859900",
-  warning: "#cb4b16",
+  status: "#94a3b8",
+  download: "#38bdf8",
+  install: "#4ade80",
+  warning: "#fbbf24",
 } as const;
 
 export type UvTerminalLine = {

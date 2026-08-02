@@ -44,11 +44,10 @@ describe("uv terminal", () => {
     expect(formatUvTerminalActivity(activity("preparedPackages"))).toBeUndefined();
   });
 
-  it("renders the fixed Solarized Light waiting surface", () => {
+  it("renders the dark terminal surface", () => {
     const markup = renderToStaticMarkup(createElement(UvTerminal, { activities: [] }));
 
-    expect(markup).toContain("h-36 w-full");
-    expect(markup).toContain("bg-[#fdf6e3]");
+    expect(markup).toContain("bg-slate-950");
     expect(markup).toContain('role="log"');
     expect(markup).toContain(UV_TERMINAL_EMPTY_MESSAGE);
   });
@@ -58,12 +57,12 @@ describe("uv terminal", () => {
     expect(isUvTerminalAtTail(300, 148, 144)).toBe(false);
   });
 
-  it("maps activity levels to Solarized Light line colors", () => {
+  it("maps activity levels to dark terminal line colors", () => {
     expect(UV_TERMINAL_COLORS).toEqual({
-      status: "#586e75",
-      download: "#268bd2",
-      install: "#859900",
-      warning: "#cb4b16",
+      status: "#94a3b8",
+      download: "#38bdf8",
+      install: "#4ade80",
+      warning: "#fbbf24",
     });
   });
 });

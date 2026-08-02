@@ -38,7 +38,7 @@ pub fn run() {
         .setup(move |app| {
             tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
                 .title("Soufmer")
-                .inner_size(820.0, 740.0)
+                .inner_size(760.0, 720.0)
                 .min_inner_size(760.0, 720.0)
                 .resizable(true)
                 .data_directory(webview_data)
