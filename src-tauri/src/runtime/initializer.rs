@@ -221,9 +221,13 @@ pub fn initialize(
     );
     emit_progress(
         &emit,
-        begin_update(
+        download_update(
             InitializationStep::PreparingTools,
+            0,
+            manifest.ffmpeg.archive_size_bytes,
             0.02,
+            0.03,
+            0,
             "preparing verified audio tools",
         ),
     );
@@ -430,24 +434,17 @@ fn install_ffmpeg(
     let start = Instant::now();
     let downloader = Downloader::new()?;
     let mut progress = |p: DownloadProgress| {
-        let fraction = p.total_bytes.map_or(0.0, |total| {
-            (p.completed_bytes as f64 / total as f64).clamp(0.0, 1.0)
-        });
         emit_progress(
             emit,
-            InitUpdate {
-                step: InitializationStep::PreparingTools,
-                current: p.total_bytes.map_or(ProgressValue::Indeterminate, |_| {
-                    ProgressValue::Determinate { fraction }
-                }),
-                fraction: 0.02 + fraction * 0.03,
-                bytes: Some((
-                    p.completed_bytes,
-                    p.total_bytes,
-                    speed(p.completed_bytes, start),
-                )),
-                detail: "downloading FFmpeg",
-            },
+            download_update(
+                InitializationStep::PreparingTools,
+                p.completed_bytes,
+                manifest.ffmpeg.archive_size_bytes,
+                0.02,
+                0.03,
+                speed(p.completed_bytes, start),
+                "downloading FFmpeg",
+            ),
         );
     };
     downloader.download(
@@ -948,6 +945,7 @@ fn emit_activity(
         level,
         message: message.into(),
         package_name,
+        package_size_bytes: None,
         completed_units: None,
         total_units: None,
     }));
@@ -974,30 +972,31 @@ impl UvActivityTracker {
             return None;
         }
 
-        if line
-            .strip_prefix("Downloading ")
-            .and_then(first_safe_package_token)
-            .is_some()
-        {
+        if let Some(value) = line.strip_prefix("Downloading ") {
+            let token = first_safe_package_token(value)?;
+            let package_name = safe_package_display_name(&token);
+            let package_size_bytes = package_name
+                .as_ref()
+                .and_then(|_| package_size_bytes(value));
             return Some(activity(
                 self.step_id,
                 InitializationActivityLevel::Download,
                 "downloadingPackage",
-                None,
+                package_name,
+                package_size_bytes,
                 None,
                 None,
             ));
         }
-        if line
-            .strip_prefix("Downloaded ")
-            .and_then(first_safe_package_token)
-            .is_some()
-        {
+        if let Some(value) = line.strip_prefix("Downloaded ") {
+            let token = first_safe_package_token(value)?;
+            let package_name = safe_package_display_name(&token);
             self.downloaded_packages = self.downloaded_packages.saturating_add(1);
             return Some(activity(
                 self.step_id,
                 InitializationActivityLevel::Download,
                 "downloadedPackage",
+                package_name,
                 None,
                 Some(self.downloaded_packages),
                 None,
@@ -1012,6 +1011,7 @@ impl UvActivityTracker {
                 InitializationActivityLevel::Install,
                 "installedPython",
                 Some(format!("Python {version}")),
+                None,
                 None,
                 None,
             ));
@@ -1065,6 +1065,7 @@ impl UvActivityTracker {
                     level,
                     message,
                     None,
+                    None,
                     Some(count),
                     Some(count),
                 ));
@@ -1079,6 +1080,7 @@ fn activity(
     level: InitializationActivityLevel,
     message: &str,
     package_name: Option<String>,
+    package_size_bytes: Option<u64>,
     completed_units: Option<u64>,
     total_units: Option<u64>,
 ) -> InitializationActivity {
@@ -1087,9 +1089,43 @@ fn activity(
         level,
         message: message.into(),
         package_name,
+        package_size_bytes,
         completed_units,
         total_units,
     }
+}
+
+fn safe_package_display_name(package: &str) -> Option<String> {
+    let normalized = package.to_ascii_lowercase();
+    let credential_shaped = normalized.starts_with("ghp_")
+        || normalized.starts_with("gho_")
+        || normalized.starts_with("ghu_")
+        || normalized.starts_with("ghs_")
+        || normalized.starts_with("github_pat_")
+        || normalized.starts_with("sk-");
+    (!credential_shaped).then(|| package.to_owned())
+}
+
+fn package_size_bytes(value: &str) -> Option<u64> {
+    const MAX_SAFE_INTEGER: f64 = 9_007_199_254_740_991.0;
+
+    let size = value.rsplit_once('(')?.1.strip_suffix(')')?.trim();
+    let unit_index = size.find(|character: char| character.is_ascii_alphabetic())?;
+    let (number, unit) = size.split_at(unit_index);
+    let number = number.trim().parse::<f64>().ok()?;
+    let multiplier = match unit.trim() {
+        "B" => 1.0,
+        "KB" => 1_000.0,
+        "KiB" => 1_024.0,
+        "MB" => 1_000_000.0,
+        "MiB" => 1_048_576.0,
+        "GB" => 1_000_000_000.0,
+        "GiB" => 1_073_741_824.0,
+        _ => return None,
+    };
+    let bytes = number * multiplier;
+    (number.is_finite() && number > 0.0 && bytes <= MAX_SAFE_INTEGER)
+        .then(|| bytes.round() as u64)
 }
 
 fn first_safe_package_token(value: &str) -> Option<String> {
@@ -1374,12 +1410,26 @@ fn update(step: InitializationStep, fraction: f64, detail: &'static str) -> Init
         detail,
     }
 }
-fn begin_update(step: InitializationStep, fraction: f64, detail: &'static str) -> InitUpdate {
+fn download_update(
+    step: InitializationStep,
+    completed_bytes: u64,
+    total_bytes: u64,
+    fraction_start: f64,
+    fraction_span: f64,
+    bytes_per_second: u64,
+    detail: &'static str,
+) -> InitUpdate {
+    let completed_bytes = completed_bytes.min(total_bytes);
+    let fraction = if total_bytes == 0 {
+        0.0
+    } else {
+        (completed_bytes as f64 / total_bytes as f64).clamp(0.0, 1.0)
+    };
     InitUpdate {
         step,
-        current: ProgressValue::Indeterminate,
-        fraction,
-        bytes: None,
+        current: ProgressValue::Determinate { fraction },
+        fraction: fraction_start + fraction * fraction_span,
+        bytes: Some((completed_bytes, Some(total_bytes), bytes_per_second)),
         detail,
     }
 }
@@ -1452,7 +1502,7 @@ impl Drop for RuntimeMutex {
 #[cfg(test)]
 mod tests {
     use super::{
-        Entry, UvActivityTracker, begin_update, embedded_manifest_bytes, parse_self_test_event,
+        Entry, UvActivityTracker, download_update, embedded_manifest_bytes, parse_self_test_event,
         private_environment, resolve_active_runtime, safe_zip_path, verify_archive_descriptor,
         verify_extracted_entry_descriptor,
     };
@@ -1516,7 +1566,8 @@ mod tests {
             .consume("\u{1b}[2KDownloading torch (2.4 GiB)\u{1b}[0m")
             .unwrap();
         assert_eq!(downloading.message, "downloadingPackage");
-        assert_eq!(downloading.package_name, None);
+        assert_eq!(downloading.package_name.as_deref(), Some("torch"));
+        assert_eq!(downloading.package_size_bytes, Some(2_576_980_378));
         assert!(matches!(
             downloading.level,
             InitializationActivityLevel::Download
@@ -1524,6 +1575,8 @@ mod tests {
 
         let first_download = tracker.consume("Downloaded torch").unwrap();
         let second_download = tracker.consume("Downloaded torchaudio").unwrap();
+        assert_eq!(first_download.package_name.as_deref(), Some("torch"));
+        assert_eq!(second_download.package_name.as_deref(), Some("torchaudio"));
         assert_eq!(first_download.completed_units, Some(1));
         assert_eq!(second_download.completed_units, Some(2));
         assert_eq!(second_download.total_units, None);
@@ -1542,6 +1595,14 @@ mod tests {
         let credential_shaped = tracker.consume("Downloading ghp_secretToken123").unwrap();
         assert_eq!(credential_shaped.message, "downloadingPackage");
         assert_eq!(credential_shaped.package_name, None);
+        assert_eq!(credential_shaped.package_size_bytes, None);
+
+        let legitimate_tokenizer = tracker.consume("Downloading tokenizers (3.2 MiB)").unwrap();
+        assert_eq!(
+            legitimate_tokenizer.package_name.as_deref(),
+            Some("tokenizers")
+        );
+        assert_eq!(legitimate_tokenizer.package_size_bytes, Some(3_355_443));
     }
 
     #[test]
@@ -1563,15 +1624,58 @@ mod tests {
     }
 
     #[test]
-    fn preparing_tools_starts_without_precompleted_current_progress() {
-        let update = begin_update(
+    fn preparing_tools_download_starts_at_measured_zero() {
+        let update = download_update(
             InitializationStep::PreparingTools,
+            0,
+            128,
             0.02,
+            0.03,
+            0,
             "preparing verified audio tools",
         );
 
-        assert!(matches!(update.current, crate::domain::ProgressValue::Indeterminate));
+        assert!(matches!(
+            update.current,
+            crate::domain::ProgressValue::Determinate { fraction: 0.0 }
+        ));
         assert_eq!(update.fraction, 0.02);
+        assert_eq!(update.bytes, Some((0, Some(128), 0)));
+    }
+
+    #[test]
+    fn preparing_tools_download_uses_the_manifest_size_and_clamps_callbacks() {
+        let halfway = download_update(
+            InitializationStep::PreparingTools,
+            64,
+            128,
+            0.02,
+            0.03,
+            32,
+            "downloading FFmpeg",
+        );
+        let beyond_total = download_update(
+            InitializationStep::PreparingTools,
+            256,
+            128,
+            0.02,
+            0.03,
+            64,
+            "downloading FFmpeg",
+        );
+
+        assert!(matches!(
+            halfway.current,
+            crate::domain::ProgressValue::Determinate { fraction } if fraction == 0.5
+        ));
+        assert_eq!(halfway.fraction, 0.035);
+        assert_eq!(halfway.bytes, Some((64, Some(128), 32)));
+        assert!(matches!(
+            beyond_total.current,
+            crate::domain::ProgressValue::Determinate { fraction } if fraction == 1.0
+        ));
+        assert_eq!(beyond_total.fraction, 0.05);
+        assert_eq!(beyond_total.bytes, Some((128, Some(128), 64)));
     }
 
     #[test]
