@@ -1,14 +1,13 @@
-import { useEffect, useRef } from "react";
 import type { TFunction } from "i18next";
 import { LoaderCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatBinaryBytes, formatBytes, formatDuration, formatRate } from "@/lib/format";
 import { useElapsedTime } from "@/hooks/use-elapsed-time";
 import type { BatchProgress, InitializationActivity, InitializationActivityEntry, InitializationProgress, ProgressValue } from "@/types/domain";
+import { UvTerminal } from "./uv-terminal";
 
 type Props = {
   progress: InitializationProgress | BatchProgress;
@@ -65,7 +64,7 @@ export function TaskProgressDialog({ progress, activities = [], mode, onCancel }
           <div><dt className="text-slate-600">{t("progress.downloaded")}</dt><dd className="mt-1 break-words font-medium">{formatBytes(progress.bytesCompleted)} / {formatBytes(progress.bytesTotal)}</dd></div>
           <div><dt className="text-slate-600">{t("progress.speed")}</dt><dd className="mt-1 font-medium">{formatRate(progress.bytesPerSecond)}</dd></div>
         </dl>}
-        {initializing && activities.length > 0 && <ActivityFeed activities={activities} />}
+        {initializing && progress.stepId === "syncingEnvironment" && <UvTerminal activities={activities} />}
         <p className="text-sm text-slate-600">{t("progress.elapsed", { time: formatDuration(elapsed) })}</p>
       </div>
       <div className="mt-7 flex justify-end">
@@ -73,39 +72,6 @@ export function TaskProgressDialog({ progress, activities = [], mode, onCancel }
       </div>
     </DialogContent>
   </Dialog>;
-}
-
-function ActivityFeed({ activities }: { activities: InitializationActivityEntry[] }) {
-  const { t } = useTranslation();
-  const viewportRef = useRef<HTMLDivElement>(null);
-  const followLatest = useRef(true);
-  const latestSequence = activities.at(-1)?.sequence;
-
-  useEffect(() => {
-    const viewport = viewportRef.current;
-    if (!viewport || !followLatest.current) return;
-    const frame = requestAnimationFrame(() => viewport.scrollTo({ top: viewport.scrollHeight }));
-    return () => cancelAnimationFrame(frame);
-  }, [latestSequence]);
-
-  return <div>
-    <p className="mb-2 text-xs font-medium uppercase text-slate-500">{t("progress.recentActivity")}</p>
-    <ScrollArea
-      className="h-28 rounded-lg border border-slate-200 bg-slate-50"
-      viewportRef={viewportRef}
-      onViewportScroll={(event) => {
-        const viewport = event.currentTarget;
-        followLatest.current = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 8;
-      }}
-    >
-      <ol className="space-y-1.5 p-3" aria-label={t("progress.recentActivity")}>
-        {activities.map(({ sequence, activity }) => <li key={sequence} className="flex gap-2 text-xs leading-5 text-slate-600">
-          <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-display-accent ring-2 ring-pink-200" />
-          <span className="min-w-0 break-words">{formatActivity(activity, t)}</span>
-        </li>)}
-      </ol>
-    </ScrollArea>
-  </div>;
 }
 
 function findCurrentActivity(activities: InitializationActivityEntry[], stepId: string) {

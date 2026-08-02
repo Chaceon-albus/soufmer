@@ -40,14 +40,18 @@ describe("backend event schemas", () => {
   });
 
   it("accepts only structured initialization activity messages", () => {
-    const activity = { stepId: "syncingEnvironment", level: "download", message: "downloadingPackage", packageName: "torch", packageSizeBytes: 2_576_980_378, completedUnits: 3, totalUnits: 8 };
+    const activity = { stepId: "syncingEnvironment", level: "download", message: "downloadingPackage", packageName: "torch", packageVersion: "2.6.0+cu124", packageSizeBytes: 2_576_980_378, completedUnits: 3, totalUnits: 8 };
     expect(initializationActivitySchema.safeParse(activity).success).toBe(true);
     expect(initializationActivitySchema.safeParse({ ...activity, completedUnits: -1 }).success).toBe(false);
     expect(initializationActivitySchema.safeParse({ ...activity, packageSizeBytes: 0 }).success).toBe(false);
     expect(initializationActivitySchema.safeParse({ ...activity, packageSizeBytes: Number.MAX_SAFE_INTEGER + 1 }).success).toBe(false);
     expect(initializationActivitySchema.safeParse({ ...activity, message: "Downloading C:\\Users\\person\\token" }).success).toBe(false);
     expect(initializationActivitySchema.safeParse({ ...activity, packageName: "C:\\Users\\person\\token" }).success).toBe(false);
+    expect(initializationActivitySchema.safeParse({ ...activity, packageName: "ghp_secretToken123" }).success).toBe(false);
     expect(initializationActivitySchema.safeParse({ ...activity, packageName: "x".repeat(108) }).success).toBe(false);
+    for (const packageVersion of ["", "file:///C:/wheel", "C:\\wheel", "2.6.0\u001b[31m", "2.6.0/../../token", "x".repeat(65)]) {
+      expect(initializationActivitySchema.safeParse({ ...activity, packageVersion }).success).toBe(false);
+    }
   });
 
   it("accepts only nonempty persisted diagnostic reports", () => {

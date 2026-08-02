@@ -1,6 +1,8 @@
 import type { AppError, BatchProgress, BatchResult, EnvironmentStatus, InitializationActivity, InitializationProgress, StartBatchRequest } from "@/types/domain";
 import { defaultSettings, mockEnvironment, type AppState } from "./app-state";
 
+const MAX_INITIALIZATION_ACTIVITIES = 100;
+
 export type AppAction =
   | { type: "booted"; environment: EnvironmentStatus; settings: Extract<AppState, { type: "idle" }> ["settings"] }
   | { type: "startRequested"; request: StartBatchRequest }
@@ -35,7 +37,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
     case "validationPassed": return state.type === "validating" ? { type: "processing", taskId: action.taskId, environment: state.environment, settings: state.settings, progress: action.progress, lastSequence: 0, outputDirectory: state.request.outputDirectory } : state;
     case "initializationAccepted": return state.type === "awaitingInitializationConsent" ? { type: "initializing", taskId: action.taskId, request: state.request, environment: state.environment, settings: state.settings, progress: action.progress, activities: [], lastSequence: 0 } : state;
     case "initializationProgress": return state.type === "initializing" && state.taskId === action.taskId && action.sequence > state.lastSequence ? { ...state, progress: monotonicInitializationProgress(state.progress, action.progress), lastSequence: action.sequence } : state;
-    case "initializationActivity": return state.type === "initializing" && state.taskId === action.taskId && action.sequence > state.lastSequence ? { ...state, activities: [...state.activities, { sequence: action.sequence, activity: action.activity }].slice(-12), lastSequence: action.sequence } : state;
+    case "initializationActivity": return state.type === "initializing" && state.taskId === action.taskId && action.sequence > state.lastSequence ? { ...state, activities: [...state.activities, { sequence: action.sequence, activity: action.activity }].slice(-MAX_INITIALIZATION_ACTIVITIES), lastSequence: action.sequence } : state;
     case "initializationCompleted": return state.type === "initializing" && state.taskId === action.taskId && action.sequence > state.lastSequence ? state.request.inputPath.trim() && state.request.outputDirectory.trim() ? { type: "validating", request: state.request, environment: action.environment, settings: state.settings } : { type: "idle", environment: action.environment, settings: state.settings } : state;
     case "processingStarted": return state.type === "initializing" ? { type: "processing", taskId: action.taskId, environment: state.environment, settings: state.settings, progress: action.progress, lastSequence: 0, outputDirectory: state.request.outputDirectory } : state;
     case "batchProgress": return state.type === "processing" && state.taskId === action.taskId && action.sequence > state.lastSequence ? { ...state, progress: action.progress, lastSequence: action.sequence } : state;

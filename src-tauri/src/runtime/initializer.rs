@@ -945,6 +945,7 @@ fn emit_activity(
         level,
         message: message.into(),
         package_name,
+        package_version: None,
         package_size_bytes: None,
         completed_units: None,
         total_units: None,
@@ -982,10 +983,11 @@ impl UvActivityTracker {
                 self.step_id,
                 InitializationActivityLevel::Download,
                 "downloadingPackage",
-                package_name,
-                package_size_bytes,
-                None,
-                None,
+                ActivityDetails {
+                    package_name,
+                    package_size_bytes,
+                    ..ActivityDetails::default()
+                },
             ));
         }
         if let Some(value) = line.strip_prefix("Downloaded ") {
@@ -996,10 +998,11 @@ impl UvActivityTracker {
                 self.step_id,
                 InitializationActivityLevel::Download,
                 "downloadedPackage",
-                package_name,
-                None,
-                Some(self.downloaded_packages),
-                None,
+                ActivityDetails {
+                    package_name,
+                    completed_units: Some(self.downloaded_packages),
+                    ..ActivityDetails::default()
+                },
             ));
         }
         if let Some(version) = line
@@ -1010,10 +1013,25 @@ impl UvActivityTracker {
                 self.step_id,
                 InitializationActivityLevel::Install,
                 "installedPython",
-                Some(format!("Python {version}")),
-                None,
-                None,
-                None,
+                ActivityDetails {
+                    package_name: Some(format!("Python {version}")),
+                    ..ActivityDetails::default()
+                },
+            ));
+        }
+
+        if let Some((package_name, package_version)) =
+            line.strip_prefix("+ ").and_then(safe_locked_requirement)
+        {
+            return Some(activity(
+                self.step_id,
+                InitializationActivityLevel::Install,
+                "installedPackage",
+                ActivityDetails {
+                    package_name: Some(package_name),
+                    package_version: Some(package_version),
+                    ..ActivityDetails::default()
+                },
             ));
         }
 
@@ -1064,10 +1082,11 @@ impl UvActivityTracker {
                     self.step_id,
                     level,
                     message,
-                    None,
-                    None,
-                    Some(count),
-                    Some(count),
+                    ActivityDetails {
+                        completed_units: Some(count),
+                        total_units: Some(count),
+                        ..ActivityDetails::default()
+                    },
                 ));
             }
         }
@@ -1075,23 +1094,30 @@ impl UvActivityTracker {
     }
 }
 
+#[derive(Default)]
+struct ActivityDetails {
+    package_name: Option<String>,
+    package_version: Option<String>,
+    package_size_bytes: Option<u64>,
+    completed_units: Option<u64>,
+    total_units: Option<u64>,
+}
+
 fn activity(
     step_id: InitializationStep,
     level: InitializationActivityLevel,
     message: &str,
-    package_name: Option<String>,
-    package_size_bytes: Option<u64>,
-    completed_units: Option<u64>,
-    total_units: Option<u64>,
+    details: ActivityDetails,
 ) -> InitializationActivity {
     InitializationActivity {
         step_id,
         level,
         message: message.into(),
-        package_name,
-        package_size_bytes,
-        completed_units,
-        total_units,
+        package_name: details.package_name,
+        package_version: details.package_version,
+        package_size_bytes: details.package_size_bytes,
+        completed_units: details.completed_units,
+        total_units: details.total_units,
     }
 }
 
@@ -1104,6 +1130,33 @@ fn safe_package_display_name(package: &str) -> Option<String> {
         || normalized.starts_with("github_pat_")
         || normalized.starts_with("sk-");
     (!credential_shaped).then(|| package.to_owned())
+}
+
+fn safe_package_name(value: &str) -> Option<String> {
+    (!value.is_empty()
+        && value.len() <= 100
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-')))
+    .then_some(value)
+    .and_then(safe_package_display_name)
+}
+
+fn safe_package_version(value: &str) -> Option<String> {
+    (!value.is_empty()
+        && value.len() <= 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'+' | b'-')))
+    .then(|| value.to_owned())
+}
+
+fn safe_locked_requirement(value: &str) -> Option<(String, String)> {
+    let (package_name, package_version) = value.split_once("==")?;
+    Some((
+        safe_package_name(package_name)?,
+        safe_package_version(package_version)?,
+    ))
 }
 
 fn package_size_bytes(value: &str) -> Option<u64> {
@@ -1124,23 +1177,13 @@ fn package_size_bytes(value: &str) -> Option<u64> {
         _ => return None,
     };
     let bytes = number * multiplier;
-    (number.is_finite() && number > 0.0 && bytes <= MAX_SAFE_INTEGER)
-        .then(|| bytes.round() as u64)
+    (number.is_finite() && number > 0.0 && bytes <= MAX_SAFE_INTEGER).then(|| bytes.round() as u64)
 }
 
 fn first_safe_package_token(value: &str) -> Option<String> {
     let token = value.split_ascii_whitespace().next()?;
     let package = token.split_once("==").map_or(token, |(name, _)| name);
-    if !package.is_empty()
-        && package.len() <= 100
-        && package
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
-    {
-        Some(package.into())
-    } else {
-        None
-    }
+    safe_package_name(package)
 }
 
 fn first_safe_version_token(value: &str) -> Option<&str> {
@@ -1590,12 +1633,31 @@ mod tests {
         assert_eq!(installed.message, "installedPackages");
         assert_eq!(installed.completed_units, Some(45));
         assert_eq!(installed.total_units, Some(45));
-        assert!(tracker.consume("+ torchaudio==2.6.0+cu124").is_none());
+        let installed_package = tracker.consume("+ torchaudio==2.6.0+cu124").unwrap();
+        assert_eq!(installed_package.message, "installedPackage");
+        assert_eq!(
+            installed_package.package_name.as_deref(),
+            Some("torchaudio")
+        );
+        assert_eq!(
+            installed_package.package_version.as_deref(),
+            Some("2.6.0+cu124")
+        );
+        assert!(matches!(
+            installed_package.level,
+            InitializationActivityLevel::Install
+        ));
 
-        let credential_shaped = tracker.consume("Downloading ghp_secretToken123").unwrap();
-        assert_eq!(credential_shaped.message, "downloadingPackage");
-        assert_eq!(credential_shaped.package_name, None);
-        assert_eq!(credential_shaped.package_size_bytes, None);
+        let colored_package = tracker
+            .consume("\u{1b}[32m+ torch==2.6.0+cu124\u{1b}[0m")
+            .unwrap();
+        assert_eq!(colored_package.package_name.as_deref(), Some("torch"));
+        assert_eq!(
+            colored_package.package_version.as_deref(),
+            Some("2.6.0+cu124")
+        );
+
+        assert!(tracker.consume("Downloading ghp_secretToken123").is_none());
 
         let legitimate_tokenizer = tracker.consume("Downloading tokenizers (3.2 MiB)").unwrap();
         assert_eq!(
@@ -1613,13 +1675,18 @@ mod tests {
             "Authorization: Bearer secret",
             "Downloading https://example.invalid/token",
             r"Downloading C:\Users\person\package.whl",
+            "+ local-package==file:///C:/Users/person/package",
+            r"+ local-package==C:\Users\person\package",
+            "+ torch=2.6.0+cu124",
+            "+ torch==",
+            "+ ==2.6.0",
+            "+ torch==2.6.0/../../secret",
+            "+ ghp_secretToken123==1.0.0",
+            "+ github_pat_secret==1.0.0",
             r"File \\server\share\worker.py, line 2",
             "arbitrary terminal output",
         ] {
-            assert!(
-                tracker.consume(line).is_none(),
-                "{line}"
-            );
+            assert!(tracker.consume(line).is_none(), "{line}");
         }
     }
 

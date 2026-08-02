@@ -16,11 +16,15 @@ const byteEstimateSchema = z.number().finite().int().nonnegative();
 export const environmentStatusSchema = z.discriminatedUnion("type", [z.object({ type: z.literal("notInstalled"), estimatedDownloadBytes: byteEstimateSchema.optional(), estimatedDiskBytes: byteEstimateSchema.optional() }), z.object({ type: z.literal("installing"), runtimeVersion: z.string() }), readyEnvironmentSchema, z.object({ type: z.literal("repairRequired"), reasonCode: z.string(), estimatedDownloadBytes: byteEstimateSchema.optional(), estimatedDiskBytes: byteEstimateSchema.optional() }), z.object({ type: z.literal("unsupported"), reasonCode: z.string() })]);
 export const appSettingsSchema = z.object({ schemaVersion: z.literal(1), locale: z.enum(["zh-CN", "en"]), lastInputMode: z.enum(["file", "folder"]), lastOutputDirectory: z.string().optional(), processingMode: z.enum(["compatibility44100", "sourceSampleRate"]), recursive: z.boolean(), preserveDirectoryStructure: z.boolean(), conflictPolicy: z.enum(["skip", "overwrite", "autoNumber"]), outputFormat: z.enum(["flac", "wavFloat32"]), generateBothModes: z.boolean() });
 export const initializationProgressSchema = z.object({ runtimeVersion: z.string(), stepIndex: z.number(), stepCount: z.number(), stepId: z.enum(["checkingSystem", "preparingTools", "installingPython", "syncingEnvironment", "downloadingModel", "selfTesting", "activating"]), overall: progressValueSchema, current: progressValueSchema, bytesCompleted: z.number().optional(), bytesTotal: z.number().optional(), bytesPerSecond: z.number().optional(), detail: z.string().nullable().optional().transform((value) => value ?? undefined) });
+const packageNameSchema = z.string()
+  .regex(/^(?:[A-Za-z0-9._-]{1,100}|Python [0-9.+-]{1,32})$/)
+  .refine((value) => !/^(?:ghp_|gho_|ghu_|ghs_|github_pat_|sk-)/i.test(value));
 export const initializationActivitySchema = z.object({
   stepId: z.enum(["checkingSystem", "preparingTools", "installingPython", "syncingEnvironment", "downloadingModel", "selfTesting", "activating"]),
   level: z.enum(["status", "download", "install", "warning"]),
   message: z.enum(["installingPython", "syncingCudaEnvironment", "downloadingAudioTools", "downloadingModel", "selfTesting", "resolvingPackages", "resolvedPackages", "downloadingPackage", "downloadedPackage", "preparingPackages", "preparedPackages", "installingPackages", "installedPackages", "installedPackage", "installedPython", "auditingPackages", "auditedPackages"]),
-  packageName: z.string().regex(/^(?:[A-Za-z0-9._-]{1,100}|Python [0-9.+-]{1,32})$/).optional(),
+  packageName: packageNameSchema.optional(),
+  packageVersion: z.string().regex(/^[A-Za-z0-9._+-]{1,64}$/).optional(),
   packageSizeBytes: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
   completedUnits: z.number().int().nonnegative().optional(),
   totalUnits: z.number().int().nonnegative().optional(),

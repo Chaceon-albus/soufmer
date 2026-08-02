@@ -180,6 +180,8 @@ pub struct InitializationActivity {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub package_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub package_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub package_size_bytes: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub completed_units: Option<u64>,

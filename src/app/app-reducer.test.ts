@@ -142,13 +142,20 @@ describe("appReducer", () => {
     });
     expect(state).toMatchObject({ progress: { stepId: "downloadingModel", overall: { fraction: 0.6 }, current: { fraction: 0.1 } } });
 
-    for (let sequence = 7; sequence <= 21; sequence += 1) {
+    for (let sequence = 7; sequence <= 111; sequence += 1) {
       state = appReducer(state, { type: "initializationActivity", taskId: "runtime-1", sequence, activity: { ...activity, packageName: `package-${sequence}` } });
     }
-    expect(state).toMatchObject({ type: "initializing", lastSequence: 21 });
+    expect(state).toMatchObject({ type: "initializing", lastSequence: 111 });
     if (state.type !== "initializing") throw new Error("expected initializing state");
-    expect(state.activities).toHaveLength(12);
-    expect(state.activities[0].sequence).toBe(10);
+    expect(state.activities).toHaveLength(100);
+    expect(state.activities[0].sequence).toBe(12);
+
+    const cancelling = appReducer(state, { type: "cancelRequested" });
+    if (cancelling.type !== "cancelling") throw new Error("expected cancelling state");
+    expect(cancelling.initializationActivities).toBe(state.activities);
+    expect(cancelling.initializationActivities).toHaveLength(100);
+    expect(cancelling.initializationActivities?.[0].sequence).toBe(12);
+    expect(appReducer(cancelling, { type: "initializationActivity", taskId: "runtime-1", sequence: 112, activity })).toBe(cancelling);
   });
   it("returns initialization cancellation to idle and only fabricates a batch result as a fallback", () => {
     const initializationProgress = {
