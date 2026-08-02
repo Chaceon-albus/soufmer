@@ -1,15 +1,196 @@
 {
-  "app": { "description": "Extract accompaniment from music with a private AI runtime.", "switchLanguage": "中文" },
-  "action": { "cancel": "Cancel", "close": "Close", "done": "Done" },
-  "main": { "input": { "type": "Input type", "file": "Single file", "folder": "Folder", "path": "Input path", "placeholder": "Select an audio file or folder", "chooseFile": "Browse file", "chooseFolder": "Browse folder" }, "output": { "label": "Output directory", "placeholder": "Select an output directory", "choose": "Browse" }, "mode": { "label": "Processing mode", "compatibility44100": { "title": "Compatibility mode (recommended)", "description": "Processes at 44.1 kHz for a more stable residual." }, "sourceSampleRate": { "title": "Preserve sample rate (experimental)", "description": "Attempts to match the source rate; some files can have alignment differences." } }, "start": "Start extraction" },
-  "advanced": { "title": "Advanced options", "recursive": "Include subfolders", "preserveStructure": "Preserve relative directory structure", "generateBoth": "Generate both processing modes", "outputFormat": "Output format", "formatFlac": "FLAC", "formatWav": "WAV Float32", "conflictPolicy": "Existing file policy", "conflictSkip": "Skip", "conflictOverwrite": "Overwrite", "conflictAutoNumber": "Add number" },
-  "environment": { "title": "AI runtime", "status": { "notInstalled": "Not installed", "installing": "Installing", "ready": "Ready", "repairRequired": "Repair required", "unsupported": "Unsupported" }, "notInstalledDetail": "First use requires about {{download}} of downloads and {{disk}} of disk space.", "readyDetail": "Runtime {{runtimeVersion}} · Model {{modelVersion}} · FFmpeg {{ffmpegVersion}}", "installingDetail": "Runtime setup is already running. Keep this window open.", "repairDetail": "The runtime needs repair before extraction can start.", "unsupportedDetail": "This system does not meet the runtime requirements.", "initialize": "Initialize runtime", "repair": "Repair runtime" },
-  "initialization": { "title": "Initialize AI runtime", "description": "The first setup downloads the private runtime. Later processing can run offline.", "estimatedDownload": "Estimated download", "estimatedDisk": "Estimated disk requirement", "install": "Download and install" },
-  "cancellation": { "title": "Cancel task?", "continue": "Keep running", "confirm": "Cancel task", "initializationConsequence": "Runtime initialization will stop. You can resume setup later.", "processingConsequence": "The current song will stop processing. Songs already completed remain in the output directory." },
-  "progress": { "initializingTitle": "Initializing runtime", "processingTitle": "Extracting accompaniment", "cancellingTitle": "Cancelling task", "overall": "Overall progress", "currentTask": "Current task", "stepCount": "Step {{current}} / {{total}}", "itemCount": "Song {{current}} / {{total}}", "downloaded": "Downloaded", "speed": "Speed", "waiting": "Waiting for progress", "elapsed": "Elapsed {{time}}", "cancelling": "Cancelling…", "activity": { "working": "Setup is continuing in the background.", "installingPython": "Installing the private Python runtime.", "syncingCudaEnvironment": "Downloading and installing large CUDA components. This may take several minutes.", "downloadingAudioTools": "Downloading the verified audio tools.", "downloadingModel": "Downloading the separation model.", "selfTesting": "Checking CUDA and the private runtime.", "resolvingPackages": "Resolving Python packages.", "resolvedPackages": "Resolved {{count}} Python packages.", "downloadingPackage": "Downloading a Python package.", "downloadingNamedPackage": "Downloading {{packageName}}.", "downloadingNamedPackageWithSize": "Downloading {{packageName}} ({{packageSize}}).", "downloadedPackage": "Downloaded {{count}} Python packages.", "downloadedNamedPackage": "Downloaded {{packageName}}.", "preparingPackages": "Preparing {{count}} Python packages.", "preparedPackages": "Prepared {{count}} Python packages.", "installingPackages": "Installing {{count}} Python packages.", "installedPackages": "Installed {{count}} Python packages.", "installedPackage": "Installed a Python package.", "installedPython": "Installed {{packageName}}.", "auditingPackages": "Auditing {{count}} Python packages.", "auditedPackages": "Audited {{count}} Python packages." }, "initialization": { "checkingSystem": "Checking system", "preparingTools": "Preparing tools", "installingPython": "Installing Python", "syncingEnvironment": "Syncing environment", "downloadingModel": "Downloading model", "selfTesting": "Testing runtime", "activating": "Activating runtime" }, "stage": { "probing": "Inspecting audio", "preparingInput": "Preparing model input", "separating": "Separating vocals", "buildingCompatibilityOutput": "Building compatibility output", "buildingSourceRateOutput": "Building source-rate output", "validatingOutput": "Validating output", "cleaningUp": "Cleaning up" } },
-  "completion": { "title": "Extraction complete", "cancelledTitle": "Extraction cancelled", "summary": "Completed items are kept in the output directory.", "succeeded": "Succeeded", "failed": "Failed", "skipped": "Skipped", "outputDirectory": "Output directory", "openOutput": "Open output directory", "failedItems": "{{count}} item(s) need attention." },
-  "error": { "title": "Task could not be completed", "recovery": "Review the diagnostic code and try again after resolving the issue.", "retryInitialization": "Retry initialization", "code": "Diagnostic code", "diagnosticId": "Diagnostic ID", "copyDiagnostics": "Copy diagnostics", "copiedDiagnostics": "Copied", "generic": "The task could not be completed. Try again after resolving the issue.", "environmentDownload": "The runtime download could not be completed.", "environmentNotInitialized": "Initialize the AI runtime before starting extraction.", "environmentDownloadFailed": "The runtime download failed. Check your connection and try again.", "environmentHashMismatch": "A downloaded runtime file could not be verified. Try initialization again.", "pythonSyncFailed": "The private Python environment could not be prepared.", "modelDownloadFailed": "The separation model could not be downloaded.", "ffmpegNotAvailable": "The audio tools are unavailable. Repair the runtime and try again.", "inputUnsupported": "This input audio file is not supported.", "outputNotWritable": "The selected output directory is not writable.", "pathUnsupported": "This path cannot be passed safely to the audio tools. Choose a shorter standard drive or network path.", "cudaNotAvailable": "A compatible NVIDIA CUDA device is not available.", "cudaOutOfMemory": "The GPU ran out of memory. Close other GPU applications and try again.", "inferenceFailed": "The separation model could not process this audio file.", "postprocessFailed": "The accompaniment output could not be created.", "taskCancelled": "The task was cancelled.", "taskAlreadyActive": "Another task is already running.", "invalidRequest": "The request is invalid. Review the selected paths and options.", "settingsInvalid": "Saved settings are invalid and need to be updated.", "manifestInvalid": "The runtime configuration is invalid. Repair the runtime and try again.", "localDataUnavailable": "The application data directory is unavailable." },
-  "license": { "open": "Attribution", "title": "Open-source attribution", "description": "Full license notices are embedded in this application.", "loading": "Loading embedded license notices…", "loadFailed": "The embedded license notices could not be loaded. Try again.", "retry": "Try again" },
-  "validation": { "inputRequired": "Choose an input file or folder.", "outputRequired": "Choose an output directory." },
-  "development": { "browserFallback": "Browser preview uses local placeholder data; desktop commands and events are unavailable.", "previewCancelled": "Preview cancellation", "previewError": "Preview error" }
+  "app": {
+    "description": "Music accompaniment extraction tool based on RoFormer model",
+    "switchLanguage": "中文"
+  },
+  "action": {
+    "cancel": "Cancel",
+    "close": "Close",
+    "done": "Done"
+  },
+  "main": {
+    "input": {
+      "type": "Input mode",
+      "file": "Single track",
+      "folder": "Audio folder",
+      "path": "Input path",
+      "placeholder": "Select or drop audio file / folder",
+      "chooseFile": "Browse",
+      "chooseFolder": "Browse"
+    },
+    "output": {
+      "label": "Output location",
+      "placeholder": "Select output directory",
+      "choose": "Browse"
+    },
+    "mode": {
+      "label": "Processing mode",
+      "compatibility44100": {
+        "title": "Compatibility mode (Recommended)",
+        "description": "Resamples to 44.1 kHz for optimal stability and clean phase residual separation."
+      },
+      "sourceSampleRate": {
+        "title": "Preserve source sample rate (Experimental)",
+        "description": "Attempts to match the source sample rate; minor phase alignment variations may occur."
+      }
+    },
+    "start": "Start extraction"
+  },
+  "advanced": {
+    "title": "Advanced options",
+    "recursive": "Include subfolders",
+    "preserveStructure": "Preserve folder hierarchy",
+    "generateBoth": "Export both processing modes",
+    "outputFormat": "Output format",
+    "formatFlac": "FLAC (Lossless)",
+    "formatWav": "WAV (Float32)",
+    "conflictPolicy": "File collision policy",
+    "conflictSkip": "Skip",
+    "conflictOverwrite": "Overwrite",
+    "conflictAutoNumber": "Auto-number"
+  },
+  "environment": {
+    "title": "Runtime Environment",
+    "status": {
+      "notInstalled": "Not downloaded",
+      "installing": "Downloading",
+      "ready": "Ready",
+      "repairRequired": "Needs repair",
+      "unsupported": "Unsupported"
+    },
+    "notInstalledDetail": "First-time use requires downloading ~{{download}} of components and at least {{disk}} of disk space.",
+    "readyDetail": "Runtime {{runtimeVersion}} · Model {{modelVersion}} · FFmpeg {{ffmpegVersion}}",
+    "installingDetail": "Initializing runtime environment in background. Please keep this window open.",
+    "repairDetail": "Runtime dependencies are missing or damaged and need repair before extraction can begin.",
+    "unsupportedDetail": "This system does not meet minimum runtime requirements.",
+    "initialize": "Initialize runtime environment",
+    "repair": "Repair runtime environment"
+  },
+  "initialization": {
+    "title": "Initialize Runtime Environment",
+    "description": "Initial setup automatically downloads the runtime environment and separation model for offline use after deployment.",
+    "estimatedDownload": "Estimated download size",
+    "estimatedDisk": "Required disk space",
+    "install": "Download"
+  },
+  "cancellation": {
+    "title": "Cancel active operation?",
+    "continue": "Keep processing",
+    "confirm": "Cancel task",
+    "initializationConsequence": "Runtime initialization will stop. You can restart downloading at any time.",
+    "processingConsequence": "Current song will stop processing. Already completed tracks remain in the output folder."
+  },
+  "progress": {
+    "initializingTitle": "Initializing runtime environment",
+    "processingTitle": "Extracting music accompaniment",
+    "cancellingTitle": "Cancelling active task",
+    "overall": "Overall progress",
+    "currentTask": "Current task",
+    "stepCount": "Step {{current}} of {{total}}",
+    "itemCount": "Track {{current}} of {{total}}",
+    "downloaded": "Downloaded",
+    "speed": "Speed",
+    "waiting": "Waiting for progress updates",
+    "elapsed": "Elapsed {{time}}",
+    "cancelling": "Cancelling",
+    "activity": {
+      "working": "Setup is continuing in the background",
+      "installingPython": "Deploying isolated Python runtime",
+      "syncingCudaEnvironment": "Downloading and deploying CUDA components (may take several minutes)",
+      "downloadingAudioTools": "Downloading audio processing tools",
+      "downloadingModel": "Downloading AI separation model weights",
+      "selfTesting": "Testing CUDA and runtime environment",
+      "resolvingPackages": "Resolving package dependencies",
+      "resolvedPackages": "Successfully resolved {{count}} package dependencies",
+      "downloadingPackage": "Downloading package dependency",
+      "downloadingNamedPackage": "Downloading {{packageName}}",
+      "downloadingNamedPackageWithSize": "Downloading {{packageName}} ({{packageSize}})",
+      "downloadedPackage": "Downloaded {{count}} package dependencies",
+      "downloadedNamedPackage": "Downloaded {{packageName}}",
+      "preparingPackages": "Preparing {{count}} package dependencies",
+      "preparedPackages": "Prepared {{count}} package dependencies",
+      "installingPackages": "Installing {{count}} package dependencies",
+      "installedPackages": "Installed {{count}} package dependencies",
+      "installedPackage": "Installed package dependency",
+      "installedPython": "Successfully deployed {{packageName}}",
+      "auditingPackages": "Auditing {{count}} package dependencies",
+      "auditedPackages": "Audited {{count}} package dependencies"
+    },
+    "initialization": {
+      "checkingSystem": "Checking system environment",
+      "preparingTools": "Preparing core tools",
+      "installingPython": "Deploying Python environment",
+      "syncingEnvironment": "Syncing dependencies",
+      "downloadingModel": "Downloading AI model",
+      "selfTesting": "Testing runtime environment",
+      "activating": "Activating AI engine"
+    },
+    "stage": {
+      "probing": "Analyzing audio format",
+      "preparingInput": "Preparing model input",
+      "separating": "Performing AI vocal separation",
+      "buildingCompatibilityOutput": "Building compatibility output",
+      "buildingSourceRateOutput": "Building source-rate output",
+      "validatingOutput": "Validating output file",
+      "cleaningUp": "Cleaning up temporary files"
+    }
+  },
+  "completion": {
+    "title": "Extraction complete",
+    "cancelledTitle": "Extraction cancelled",
+    "summary": "Completed files are saved in the output directory.",
+    "succeeded": "Succeeded",
+    "failed": "Failed",
+    "skipped": "Skipped",
+    "outputDirectory": "Output directory",
+    "openOutput": "Open output directory",
+    "failedItems": "{{count}} item(s) need attention."
+  },
+  "error": {
+    "title": "Task failed to complete",
+    "recovery": "Review the diagnostic details below and try again after resolving the issue.",
+    "retryInitialization": "Retry initialization",
+    "code": "Error code",
+    "diagnosticId": "Diagnostic ID",
+    "copyDiagnostics": "Copy diagnostic details",
+    "copiedDiagnostics": "Copied",
+    "generic": "Task failed to complete. Please try again after addressing the issue.",
+    "environmentDownload": "Failed to download runtime environment resources.",
+    "environmentNotInitialized": "Initialize the runtime environment before starting extraction.",
+    "environmentDownloadFailed": "Runtime environment download failed. Check your network connection and try again.",
+    "environmentHashMismatch": "Downloaded environment file verification failed. Please re-initialize.",
+    "pythonSyncFailed": "Could not configure the isolated Python runtime.",
+    "modelDownloadFailed": "Could not download the AI separation model.",
+    "ffmpegNotAvailable": "Audio processing tools are unavailable. Please repair the environment and try again.",
+    "inputUnsupported": "Unsupported audio file format.",
+    "outputNotWritable": "Selected output directory is not writable.",
+    "pathUnsupported": "Path cannot be passed safely to audio tools. Please choose a standard drive path.",
+    "cudaNotAvailable": "No compatible NVIDIA CUDA GPU available.",
+    "cudaOutOfMemory": "GPU ran out of memory. Close other graphics-heavy applications and try again.",
+    "inferenceFailed": "Separation model failed to process this audio file.",
+    "postprocessFailed": "Could not create final accompaniment output.",
+    "taskCancelled": "Task was cancelled.",
+    "taskAlreadyActive": "Another task is currently running.",
+    "invalidRequest": "Invalid request. Please check selected paths and options.",
+    "settingsInvalid": "Saved settings were invalid and have been reset.",
+    "manifestInvalid": "Runtime environment configuration is invalid. Please repair the environment.",
+    "localDataUnavailable": "Application data directory is inaccessible."
+  },
+  "license": {
+    "open": "Attribution",
+    "title": "Open-source attributions",
+    "description": "Full license declarations embedded in this application.",
+    "loading": "Loading embedded license notices…",
+    "loadFailed": "Could not load embedded license notices. Please try again.",
+    "retry": "Retry"
+  },
+  "validation": {
+    "inputRequired": "Please select an input audio file or folder.",
+    "outputRequired": "Please select an output directory."
+  },
+  "development": {
+    "browserFallback": "Browser preview uses mock data; desktop commands and IPC events are disabled.",
+    "previewCancelled": "Preview cancellation",
+    "previewError": "Preview error"
+  }
 }
