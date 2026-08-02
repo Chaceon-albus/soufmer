@@ -53,11 +53,19 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 }
 
 function monotonicInitializationProgress(previous: InitializationProgress, next: InitializationProgress): InitializationProgress {
-  if (previous.overall.kind !== "determinate" || next.overall.kind !== "determinate") return next;
+  const overall = monotonicProgressValue(previous.overall, next.overall);
+  const current = previous.stepId === next.stepId ? monotonicProgressValue(previous.current, next.current) : next.current;
   return {
     ...next,
-    overall: { kind: "determinate", fraction: Math.max(previous.overall.fraction ?? 0, next.overall.fraction ?? 0) },
+    overall,
+    current,
   };
+}
+
+function monotonicProgressValue(previous: InitializationProgress["overall"], next: InitializationProgress["overall"]): InitializationProgress["overall"] {
+  if (previous.kind !== "determinate") return next;
+  if (next.kind !== "determinate") return previous;
+  return { kind: "determinate", fraction: Math.max(previous.fraction ?? 0, next.fraction ?? 0) };
 }
 
 function sameSettings(left: Extract<AppState, { type: "idle" }> ["settings"], right: Extract<AppState, { type: "idle" }> ["settings"]) {

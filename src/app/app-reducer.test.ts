@@ -116,17 +116,39 @@ describe("appReducer", () => {
       type: "initializationProgress",
       taskId: "runtime-1",
       sequence: 3,
-      progress: { ...initializationProgress, overall: { kind: "determinate", fraction: 0.10 }, current: { kind: "determinate", fraction: 1 } },
+      progress: { ...initializationProgress, overall: { kind: "determinate", fraction: 0.10 }, current: { kind: "determinate", fraction: 0.8 } },
     });
-    expect(state).toMatchObject({ progress: { overall: { fraction: 0.15 }, current: { kind: "determinate", fraction: 1 } } });
+    state = appReducer(state, {
+      type: "initializationProgress",
+      taskId: "runtime-1",
+      sequence: 4,
+      progress: { ...initializationProgress, overall: { kind: "determinate", fraction: 0.12 }, current: { kind: "determinate", fraction: 0.2 } },
+    });
+    expect(state).toMatchObject({ progress: { overall: { fraction: 0.15 }, current: { kind: "determinate", fraction: 0.8 } } });
 
-    for (let sequence = 4; sequence <= 18; sequence += 1) {
+    state = appReducer(state, {
+      type: "initializationProgress",
+      taskId: "runtime-1",
+      sequence: 5,
+      progress: { ...initializationProgress, overall: { kind: "indeterminate" }, current: { kind: "indeterminate" } },
+    });
+    expect(state).toMatchObject({ progress: { overall: { fraction: 0.15 }, current: { kind: "determinate", fraction: 0.8 } } });
+
+    state = appReducer(state, {
+      type: "initializationProgress",
+      taskId: "runtime-1",
+      sequence: 6,
+      progress: { ...initializationProgress, stepIndex: 5, stepId: "downloadingModel", overall: { kind: "determinate", fraction: 0.6 }, current: { kind: "determinate", fraction: 0.1 } },
+    });
+    expect(state).toMatchObject({ progress: { stepId: "downloadingModel", overall: { fraction: 0.6 }, current: { fraction: 0.1 } } });
+
+    for (let sequence = 7; sequence <= 21; sequence += 1) {
       state = appReducer(state, { type: "initializationActivity", taskId: "runtime-1", sequence, activity: { ...activity, packageName: `package-${sequence}` } });
     }
-    expect(state).toMatchObject({ type: "initializing", lastSequence: 18 });
+    expect(state).toMatchObject({ type: "initializing", lastSequence: 21 });
     if (state.type !== "initializing") throw new Error("expected initializing state");
     expect(state.activities).toHaveLength(12);
-    expect(state.activities[0].sequence).toBe(7);
+    expect(state.activities[0].sequence).toBe(10);
   });
   it("returns initialization cancellation to idle and only fabricates a batch result as a fallback", () => {
     const initializationProgress = {
