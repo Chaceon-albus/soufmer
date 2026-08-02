@@ -21,6 +21,7 @@ export const initializationActivitySchema = z.object({
   level: z.enum(["status", "download", "install", "warning"]),
   message: z.enum(["installingPython", "syncingCudaEnvironment", "downloadingAudioTools", "downloadingModel", "selfTesting", "resolvingPackages", "resolvedPackages", "downloadingPackage", "downloadedPackage", "preparingPackages", "preparedPackages", "installingPackages", "installedPackages", "installedPackage", "installedPython", "auditingPackages", "auditedPackages"]),
   packageName: z.string().regex(/^(?:[A-Za-z0-9._-]{1,100}|Python [0-9.+-]{1,32})$/).optional(),
+  packageSizeBytes: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
   completedUnits: z.number().int().nonnegative().optional(),
   totalUnits: z.number().int().nonnegative().optional(),
 });

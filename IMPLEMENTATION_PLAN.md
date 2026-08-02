@@ -477,9 +477,10 @@ Progress rules:
 - Use determinate progress only for measured bytes or reliable completed/total units.
 - Keep unmeasurable work indeterminate; never derive percentages from elapsed time or a spinner.
 - Keep overall progress monotonic and stage-weighted.
-- During long environment synchronization, parse the pinned uv text output into sanitized phase and
-  package-count milestones, show the current milestone with an indeterminate step bar, and retain a
-  bounded activity feed. uv's preview JSON output is not a live progress protocol.
+- During long environment synchronization, parse the pinned uv text output into sanitized phase,
+  package-name, declared-size, and package-count milestones. Show the current milestone with an
+  indeterminate step bar and retain a bounded activity feed. uv's preview JSON output is not a live
+  progress protocol.
 - Strip ANSI control sequences and never expose command lines, credentials, raw tracebacks, or an
   unrestricted terminal transcript.
 - Preserve complete bounded process output in diagnostics.

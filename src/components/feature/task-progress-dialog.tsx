@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { formatBytes, formatDuration, formatRate } from "@/lib/format";
+import { formatBinaryBytes, formatBytes, formatDuration, formatRate } from "@/lib/format";
 import { useElapsedTime } from "@/hooks/use-elapsed-time";
 import type { BatchProgress, InitializationActivity, InitializationActivityEntry, InitializationProgress, ProgressValue } from "@/types/domain";
 
@@ -116,6 +116,14 @@ function findCurrentActivity(activities: InitializationActivityEntry[], stepId: 
 }
 
 function formatActivity(activity: InitializationActivity, t: TFunction) {
+  if (activity.message === "downloadingPackage" && activity.packageName) {
+    return activity.packageSizeBytes
+      ? t("progress.activity.downloadingNamedPackageWithSize", { packageName: activity.packageName, packageSize: formatBinaryBytes(activity.packageSizeBytes) })
+      : t("progress.activity.downloadingNamedPackage", { packageName: activity.packageName });
+  }
+  if (activity.message === "downloadedPackage" && activity.packageName) {
+    return t("progress.activity.downloadedNamedPackage", { packageName: activity.packageName });
+  }
   return t(`progress.activity.${activity.message}`, {
     packageName: activity.packageName,
     count: activity.completedUnits ?? activity.totalUnits,
