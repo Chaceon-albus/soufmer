@@ -1,16 +1,22 @@
-# Accompaniment Extractor — Implementation Plan
+# Soufmer Architecture
 
-Status: Main implementation complete; maintenance and owner-directed refinement
+Status: Implemented architecture and durable technical reference
 Last reviewed: 2026-08-02
 Target platform: Windows 10/11 x64
 Default UI locale: Simplified Chinese (`zh-CN`)
 Development language: English
 Primary stack: Tauri 2, Rust, React, TypeScript, Vite, Tailwind CSS, shadcn/ui, and Python managed by uv
 
-## 1. Purpose and current state
+## 1. Document role and current system
 
-This document is the compact architectural and maintenance plan for the repository. Detailed coding,
-Git, delegation, and validation rules belong in `AGENTS.md`.
+This document describes the implemented architecture, stable product behavior, repository structure,
+runtime contracts, process boundaries, and durable technical decisions. It is not a task backlog or a
+phase-by-phase implementation plan. Agents use Codex `/plan` mode for session-local planning and follow
+`AGENTS.md` for coding, Git, delegation, and validation rules.
+
+Read this document before changing component responsibilities, IPC or worker protocols, runtime and
+storage layout, security boundaries, audio processing, initialization behavior, build/distribution, or
+other documented invariants.
 
 The implemented application:
 
@@ -27,9 +33,6 @@ The implemented application:
 
 The project owner has manually confirmed that the standalone application starts, initializes the AI
 environment, and successfully separates audio on the current development machine.
-
-Manual and release testing are managed by the project owner and are intentionally not tracked as
-unfinished checklist items in this plan.
 
 ## 2. Product behavior
 
@@ -128,7 +131,6 @@ The normal UI must not expose command construction, raw tracebacks, or unrestric
 ```text
 .
 ├─ AGENTS.md
-├─ IMPLEMENTATION_PLAN.md
 ├─ LICENSE
 ├─ THIRD_PARTY_NOTICES.md
 ├─ README.md
@@ -478,11 +480,11 @@ Progress rules:
 - Keep unmeasurable work indeterminate; never derive percentages from elapsed time or a spinner.
 - Keep overall progress monotonic and stage-weighted.
 - During long environment synchronization, parse the pinned uv text output into sanitized phase,
-  package-name, package-version, declared-size, and package-count milestones. Show the current
-  localized milestone with an indeterminate step bar and retain up to 100 structured events. During
-  Step 4 only, render the approved resolved, download, prepared, installed-package, and installed
-  milestones as a bounded Solarized Light uv-style terminal. uv's preview JSON output is not a live
-  progress protocol, and the terminal is not a generic process-output channel.
+  package-name, package-version, declared-size, and package-count milestones. Track CUDA environment
+  synchronization progress with continuous byte-level monitoring using direct handle metadata queries
+  and dynamically accumulated wheel download totals. To keep the UI clean, the structured `UvTerminal`
+  component is retained in the codebase for activity modeling but hidden from the normal progress
+  dialog, while byte totals and transfer rates are displayed using unified IEC binary units (`GiB`, `MiB`, `KiB`).
 - Strip ANSI control sequences and never expose command lines, credentials, raw tracebacks, or an
   unrestricted terminal transcript.
 - Preserve complete bounded process output in diagnostics.
@@ -563,22 +565,31 @@ stale transitions must not corrupt active state.
 - Preserve upstream model architecture, checkpoint keys, chunking, overlap-add behavior, and core
   inference mathematics unless a measured compatibility issue justifies a recorded patch.
 
-## 13. Maintenance workflow
+## 13. Architecture maintenance
 
-For future changes:
+`docs/ARCHITECTURE.md` is the durable description of the system that exists, not a record of every task
+or experiment.
 
-1. Read `AGENTS.md` and this plan.
-2. Inspect the current Git status, recent commits, and relevant implementation before editing.
-3. Keep architecture and security boundaries intact.
-4. Implement the smallest coherent change.
-5. Update this plan only when a stable architectural decision, product invariant, or deferred item
-   changes.
-6. Keep implementation and directly related documentation in the same logical commit.
+Update this file in the same logical commit when a change modifies any of the following:
 
-This document is no longer a phase-by-phase completion checklist. Completed historical phases and
-unfinished manual test tasks have been removed to keep the active context small.
+- Component responsibility boundaries or major data flow.
+- Tauri commands, event envelopes, worker protocol, or stable error contracts.
+- Runtime bootstrap, activation, storage layout, dependency authority, or distribution model.
+- Windows path conversion, process control, cancellation, archive validation, or another security boundary.
+- Audio model-input, inference, residual, encoding, publication, or batch-planning invariants.
+- Frontend state-machine structure, initialization/progress behavior, or another durable UX contract.
+- A durable technical decision that future maintainers must understand to change the system safely.
 
-## 14. Deferred product work
+For other major changes, update the file when the existing description would become incomplete or
+misleading. Routine bug fixes, local refactors, tests, copy changes, and minor styling changes do not
+require an update unless they alter documented behavior or invariants.
+
+Document only accepted, implemented architecture. Keep temporary plans, investigation notes, and
+unselected alternatives in the active Codex session rather than in this file. When implementation and
+this document disagree, inspect the code and Git history, resolve the discrepancy, and update the
+document instead of preserving stale prose.
+
+## 14. Known deferred design topics
 
 These items are optional future refinements rather than incomplete MVP requirements:
 
@@ -595,9 +606,9 @@ These items are optional future refinements rather than incomplete MVP requireme
 - Crash recovery for abandoned job directories.
 
 Keep detailed audio refinements in `docs/AUDIO_PIPELINE.md` and broader release operations in the
-appropriate documentation rather than expanding this plan into a test matrix.
+appropriate documentation rather than expanding this architecture document into a test matrix.
 
-## 15. Build reference
+## 15. Build and artifact reference
 
 Common repository commands:
 
@@ -620,7 +631,7 @@ src-tauri/target/release/soufmer.exe
 Manual functional and release validation is performed by the project owner and is not represented as
 pending work in this document.
 
-## 16. Definition of the implemented MVP
+## 16. Implemented product baseline
 
 The implemented MVP provides:
 
@@ -636,7 +647,7 @@ The implemented MVP provides:
 - Per-item temporary-file cleanup and safe partial-file publication.
 - Embedded and accessible third-party notices.
 
-## 17. Key decisions
+## 17. Durable decisions
 
 - Use an online private runtime bootstrap because the full Python/CUDA/model environment is too large
   to bundle inside the portable executable.
@@ -647,10 +658,12 @@ The implemented MVP provides:
 - Use the pinned SoXR-enabled BtbN FFmpeg build recorded in the runtime manifest and licensing files.
 - Normalize canonical Windows paths only at validated external-process boundaries.
 - Show structured initialization activity without pretending indeterminate work has a percentage.
+- Track CUDA environment synchronization using non-overlapping byte delta monitoring (direct handle metadata queries on private cache/temp directories) combined with dynamically accumulated package sizes (`Downloading <pkg> (<size>)`).
+- Standardize all frontend file size and transfer rate formatting (`formatBytes`, `formatBinaryBytes`, `formatRate`) to use consistent IEC binary units (`GiB`, `MiB`, `KiB`, `B`, `MiB/s`).
 - Use a Final Cut-inspired magenta theme with a darker accessible primary control color.
 - Keep primary actions visible without normal page-level scrolling.
 
-## 18. Documentation and references
+## 18. Documentation map and references
 
 Repository documentation:
 

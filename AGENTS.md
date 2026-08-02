@@ -8,7 +8,7 @@ The application is intended for non-technical users. It must ship as one movable
 command-line details, initialize its private runtime on first launch, process files sequentially,
 and present clear Simplified Chinese UI text and progress feedback.
 
-This file defines the repository-wide working rules for coding agents. Read it before modifying the repository. Keep root-level guidance precise and broadly applicable; place genuinely subsystem-specific overrides in a nested `AGENTS.md` or `AGENTS.override.md` close to the affected code instead of duplicating or bloating this file.
+This file defines the repository-wide working rules for coding agents. Read it before modifying the repository. Use `docs/ARCHITECTURE.md` to understand the implemented system, durable design decisions, data flows, and runtime contracts. `AGENTS.md` is normative for agent behavior and repository constraints; `docs/ARCHITECTURE.md` is the durable technical description and must remain consistent with the implementation. Keep root-level guidance precise and broadly applicable; place genuinely subsystem-specific overrides in a nested `AGENTS.md` or `AGENTS.override.md` close to the affected code instead of duplicating or bloating this file.
 
 ## 2. Product scope
 
@@ -38,7 +38,7 @@ This file defines the repository-wide working rules for coding agents. Read it b
 
 ### Explicit non-goals for the MVP
 
-Do not implement these unless the implementation plan reaches the relevant deferred phase or the user explicitly requests them:
+Do not implement these unless the user explicitly requests them or an approved task requires them:
 
 - macOS or Linux support.
 - Mobile support.
@@ -369,7 +369,7 @@ It must contain:
 
 - Task title.
 - Overall progress bar.
-- Overall count or phase indicator.
+- Overall count or stage indicator.
 - Current item or current installation step.
 - Current-task progress bar.
 - Current stage text.
@@ -480,7 +480,7 @@ Before adding a dependency:
 1. Confirm the standard library or an existing dependency cannot handle the task cleanly.
 2. Prefer established projects with active maintenance.
 3. Avoid overlapping libraries with the same responsibility.
-4. Record the reason in the implementing commit or plan checklist.
+4. Record the reason in the implementing commit and update `docs/ARCHITECTURE.md` when the dependency changes a durable architectural decision.
 
 Preferred Rust dependencies may include:
 
@@ -558,7 +558,7 @@ Maintain a short `docs/SMOKE_TEST.md` checklist for:
 
 ## 14. Quality gates
 
-Before declaring a phase complete, run the applicable commands.
+Before declaring a completed change or release checkpoint ready, run the applicable commands.
 
 Frontend:
 
@@ -607,7 +607,6 @@ Target structure:
 ```text
 .
 ├─ AGENTS.md
-├─ IMPLEMENTATION_PLAN.md
 ├─ LICENSE
 ├─ THIRD_PARTY_NOTICES.md
 ├─ package.json
@@ -671,28 +670,36 @@ Do not create layers or abstractions that are unused. Prefer cohesive modules wi
 
 ## 17. Agent workflow
 
+### Planning and architecture records
+
+- Use Codex `/plan` mode for non-trivial work that benefits from explicit sequencing, risk analysis, or checkpoints. The plan is session-local working state; do not recreate a persistent repository-wide implementation-plan file unless the user explicitly asks for one.
+- Read `docs/ARCHITECTURE.md` before changing component boundaries, runtime behavior, IPC or worker protocols, storage layout, security boundaries, audio processing, build/distribution behavior, or other documented invariants.
+- Update `docs/ARCHITECTURE.md` in the same logical commit whenever an architectural change alters responsibilities, data flow, public/internal protocols, runtime or storage contracts, security assumptions, deployment, or a durable technical decision.
+- For other major changes, use judgment: update the architecture document when it would otherwise become incomplete or misleading for the next maintainer. Routine bug fixes, local refactors, tests, copy changes, and minor styling changes do not require an architecture update unless they change documented behavior or invariants.
+- Keep transient task steps, experiments, and unaccepted alternatives out of `docs/ARCHITECTURE.md`. Record only the implemented state and durable decisions.
+
 ### Task workflow
 
-1. Read this file, applicable nested instructions, and the relevant `IMPLEMENTATION_PLAN.md` sections before editing.
-2. Inspect the implementation before making architectural changes.
-3. Establish the repository state with `git status --short`, `git diff --stat`, `git diff`, and `git log --oneline --decorate -n 15`. When untracked files exist, also run `git ls-files --others --exclude-standard`.
-4. Treat pre-existing tracked and untracked changes as user work until their purpose is understood. Never discard them merely to obtain a clean worktree.
-5. Define the smallest coherent result, acceptance criteria, and narrowest useful validation.
+1. Read this file, applicable nested instructions, and the relevant parts of `docs/ARCHITECTURE.md` before editing.
+2. For a non-trivial task, use `/plan` mode to define the smallest coherent results, acceptance criteria, dependencies, and validation sequence.
+3. Inspect the implementation before making architectural changes.
+4. Establish the repository state with `git status --short`, `git diff --stat`, `git diff`, and `git log --oneline --decorate -n 15`. When untracked files exist, also run `git ls-files --others --exclude-standard`.
+5. Treat pre-existing tracked and untracked changes as user work until their purpose is understood. Never discard them merely to obtain a clean worktree.
 6. Implement one independently reviewable unit at a time. Add only focused tests justified by Section 13 and run focused checks while iterating.
-7. Update `IMPLEMENTATION_PLAN.md`, manifests, lockfiles, translations, and documentation when the unit changes their recorded state.
+7. Update architecture documentation, manifests, lockfiles, translations, and other durable documentation when the completed unit changes their recorded state.
 8. Commit each completed unit under the policy below before switching concerns.
-9. Run all applicable Section 14 quality gates before declaring a phase or release checkpoint complete.
+9. Run all applicable Section 14 quality gates before declaring a completed change or release checkpoint ready.
 10. Do not stop after planning unless the user requested planning only or a destructive or materially ambiguous decision requires confirmation. Do not silently expand scope.
 
 ### Commit policy
 
-A commit unit is an independently reviewable, internally consistent, and independently testable logical change. A plan phase may contain several commit units and normally should produce several commits when it spans distinct concerns.
+A commit unit is an independently reviewable, internally consistent, and independently testable logical change. A large task may contain several commit units and normally should produce several commits when it spans distinct concerns.
 
 Typical units are one behavior or module with focused tests; one narrow bug fix; one behavior-preserving refactor; one dependency/runtime/vendor update with required lockfiles, manifests, hashes, licenses, and validation; or one focused build, documentation, localization, or test-infrastructure change.
 
-Elapsed time, file count, individual file edits, a broad phase boundary, and catch-all labels such as "misc changes" are not sufficient boundaries. Commit only when one coherent unit is complete, relevant checks pass or a missing check is documented, required supporting artifacts are included, no known incomplete behavior is presented as complete, and the staged diff contains only that unit.
+Elapsed time, file count, individual file edits, a broad task boundary, and catch-all labels such as "misc changes" are not sufficient boundaries. Commit only when one coherent unit is complete, relevant checks pass or a missing check is documented, required supporting artifacts are included, no known incomplete behavior is presented as complete, and the staged diff contains only that unit.
 
-Commit before switching to an unrelated subsystem or concern, beginning a separate dependency/runtime/vendor change, pausing with completed work, or declaring a phase complete. Keep the worktree bounded to one active incomplete concern whenever practical; do not wait for the end of a large phase.
+Commit before switching to an unrelated subsystem or concern, beginning a separate dependency/runtime/vendor change, pausing with completed work, or declaring the requested task complete. Keep the worktree bounded to one active incomplete concern whenever practical; do not wait for the end of a large task.
 
 ### Staging and commit procedure
 
@@ -710,7 +717,7 @@ Before every commit:
 Additional rules:
 
 - Keep behavior and its tests together unless the tests are an independent infrastructure change.
-- Update `IMPLEMENTATION_PLAN.md` with the implementation it describes; do not mark an item complete before required validation succeeds.
+- Update `docs/ARCHITECTURE.md` under the architecture-maintenance rules above; do not document an intended architecture as implemented before the code and required validation support it.
 - Commit required reproducible lockfiles and manifests, but never caches, temporary files, local environments, build outputs, secrets, tokens, or accidental downloads.
 - Avoid WIP, empty, and knowingly broken commits. Leave incomplete work uncommitted and report it.
 - Follow repository history. If no convention exists, use a concise Conventional Commit-style subject such as `fix(worker): reject invalid model metadata`.
@@ -733,9 +740,9 @@ The main agent reviews actual diffs and evidence and alone stages and commits. S
 
 ### Completion report
 
-On completion or a genuine blocker, report completed plan items, remaining work, commit hashes and subjects, validation results, intentionally uncommitted files with reasons, and material assumptions or risks.
+On completion or a genuine blocker, report completed work, remaining work, commit hashes and subjects, validation results, intentionally uncommitted files with reasons, and material assumptions or risks.
 
-When requirements are ambiguous, prefer the simplest behavior consistent with this file and the implementation plan. Mark deferred audio-quality refinements with explicit TODO references instead of inventing unverified signal-processing behavior.
+When requirements are ambiguous, prefer the simplest behavior consistent with this file and `docs/ARCHITECTURE.md`. Mark deferred audio-quality refinements with explicit TODO references instead of inventing unverified signal-processing behavior.
 
 ## 18. Official references
 
