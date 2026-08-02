@@ -878,6 +878,8 @@ fn run(
 struct SyncByteState {
     dynamic_total_bytes: u64,
     completed_download_bytes: u64,
+    active_download_sizes: BTreeMap<String, u64>,
+    active_download_start_cache_bytes: u64,
 }
 
 fn active_handle_file_size(dir: &Path) -> u64 {
@@ -936,17 +938,30 @@ fn run_monitored_uv_sync(
                 break;
             }
 
-            let active_bytes =
+            let current_cache_bytes =
                 active_handle_file_size(&uv_cache_clone) + active_handle_file_size(&temp_clone);
-            let (completed_base, dynamic_total) = {
+
+            let (completed_base, active_target_sum, start_cache_bytes, dynamic_total) = {
                 let Ok(state) = state_clone.lock() else {
                     continue;
                 };
-                (state.completed_download_bytes, state.dynamic_total_bytes)
+                let active_target_sum: u64 = state.active_download_sizes.values().sum();
+                (
+                    state.completed_download_bytes,
+                    active_target_sum,
+                    state.active_download_start_cache_bytes,
+                    state.dynamic_total_bytes,
+                )
+            };
+
+            let active_progress = if active_target_sum > 0 && current_cache_bytes > start_cache_bytes {
+                (current_cache_bytes - start_cache_bytes).min(active_target_sum)
+            } else {
+                0
             };
 
             let estimated_total = dynamic_total.max(2_600_000_000);
-            let current_completed = (completed_base + active_bytes).min(estimated_total);
+            let current_completed = (completed_base + active_progress).min(estimated_total);
 
             let now = Instant::now();
             let elapsed_secs = now.duration_since(last_time).as_secs_f64();
@@ -990,6 +1005,8 @@ fn run_monitored_uv_sync(
             InitializationStep::SyncingEnvironment,
             Arc::clone(emit),
             Some(byte_state),
+            uv_cache_dir,
+            temp_dir,
         )),
     )
     .map(|_| ());
@@ -1009,7 +1026,7 @@ fn run_output(
     code: ErrorCode,
     activity: Option<(InitializationStep, InitEventSink)>,
 ) -> Result<crate::process::ProcessOutput, AppError> {
-    let activity = activity.map(|(step, emit)| (step, emit, None));
+    let activity = activity.map(|(step, emit)| (step, emit, None, PathBuf::new(), PathBuf::new()));
     let result = capture_output(exe, args, cwd, environment, cancellation, code, activity)?;
     if result.exit_code == Some(0) {
         Ok(result)
@@ -1029,6 +1046,8 @@ fn capture_output(
         InitializationStep,
         InitEventSink,
         Option<Arc<std::sync::Mutex<SyncByteState>>>,
+        PathBuf,
+        PathBuf,
     )>,
 ) -> Result<crate::process::ProcessOutput, AppError> {
     let mut spec = ProcessSpec::new(exe);
@@ -1043,8 +1062,13 @@ fn capture_output(
             Some(PathBuf::from(directory).join(format!("runtime-{}.stderr.log", Uuid::new_v4())));
     }
     let on_stderr_line: Arc<dyn Fn(String) + Send + Sync> = match activity {
-        Some((step, emit, byte_state)) => {
-            let tracker = std::sync::Mutex::new(UvActivityTracker::new(step, byte_state));
+        Some((step, emit, byte_state, uv_cache_dir, temp_dir)) => {
+            let tracker = std::sync::Mutex::new(UvActivityTracker::new(
+                step,
+                byte_state,
+                uv_cache_dir,
+                temp_dir,
+            ));
             Arc::new(move |line| {
                 let Ok(mut tracker) = tracker.lock() else {
                     return;
@@ -1097,12 +1121,16 @@ struct UvActivityTracker {
     total_packages: Option<u64>,
     byte_state: Option<Arc<std::sync::Mutex<SyncByteState>>>,
     active_download_sizes: BTreeMap<String, u64>,
+    uv_cache_dir: PathBuf,
+    temp_dir: PathBuf,
 }
 
 impl UvActivityTracker {
     fn new(
         step_id: InitializationStep,
         byte_state: Option<Arc<std::sync::Mutex<SyncByteState>>>,
+        uv_cache_dir: PathBuf,
+        temp_dir: PathBuf,
     ) -> Self {
         Self {
             step_id,
@@ -1111,6 +1139,8 @@ impl UvActivityTracker {
             total_packages: None,
             byte_state,
             active_download_sizes: BTreeMap::new(),
+            uv_cache_dir,
+            temp_dir,
         }
     }
 
@@ -1131,6 +1161,12 @@ impl UvActivityTracker {
                 self.active_download_sizes.insert(name.clone(), size);
                 if let Some(state) = &self.byte_state {
                     if let Ok(mut state) = state.lock() {
+                        let current_cache = active_handle_file_size(&self.uv_cache_dir)
+                            + active_handle_file_size(&self.temp_dir);
+                        if state.active_download_sizes.is_empty() {
+                            state.active_download_start_cache_bytes = current_cache;
+                        }
+                        state.active_download_sizes.insert(name.clone(), size);
                         state.dynamic_total_bytes = state.dynamic_total_bytes.saturating_add(size);
                     }
                 }
@@ -1151,12 +1187,17 @@ impl UvActivityTracker {
             let token = first_safe_package_token(value)?;
             let package_name = safe_package_display_name(&token);
             if let Some(name) = &package_name {
-                if let Some(size) = self.active_download_sizes.remove(name) {
-                    if let Some(state) = &self.byte_state {
-                        if let Ok(mut state) = state.lock() {
+                let size = self.active_download_sizes.remove(name);
+                if let Some(state) = &self.byte_state {
+                    if let Ok(mut state) = state.lock() {
+                        let current_cache = active_handle_file_size(&self.uv_cache_dir)
+                            + active_handle_file_size(&self.temp_dir);
+                        let pkg_size = state.active_download_sizes.remove(name).or(size);
+                        if let Some(pkg_size) = pkg_size {
                             state.completed_download_bytes =
-                                state.completed_download_bytes.saturating_add(size);
+                                state.completed_download_bytes.saturating_add(pkg_size);
                         }
+                        state.active_download_start_cache_bytes = current_cache;
                     }
                 }
             }
@@ -1781,7 +1822,12 @@ mod tests {
 
     #[test]
     fn parses_only_sanitized_recognized_uv_activity() {
-        let mut tracker = UvActivityTracker::new(InitializationStep::SyncingEnvironment, None);
+        let mut tracker = UvActivityTracker::new(
+            InitializationStep::SyncingEnvironment,
+            None,
+            PathBuf::new(),
+            PathBuf::new(),
+        );
         let downloading = tracker
             .consume("\u{1b}[2KDownloading torch (2.4 GiB)\u{1b}[0m")
             .unwrap();
@@ -1861,7 +1907,12 @@ mod tests {
 
     #[test]
     fn rejects_untrusted_or_path_bearing_uv_output() {
-        let mut tracker = UvActivityTracker::new(InitializationStep::SyncingEnvironment, None);
+        let mut tracker = UvActivityTracker::new(
+            InitializationStep::SyncingEnvironment,
+            None,
+            PathBuf::new(),
+            PathBuf::new(),
+        );
         for line in [
             "Traceback (most recent call last):",
             "Authorization: Bearer secret",
