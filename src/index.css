@@ -2,12 +2,12 @@
 
 @theme {
   --font-sans: "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
-  --color-primary: #c12b8f;
-  --color-primary-hover: #a61e73;
-  --color-primary-active: #8f185f;
+  --color-primary: #fb7299;
+  --color-primary-hover: #e85b84;
+  --color-primary-active: #d1436f;
   --color-display-accent: #ff8ad8;
-  --color-focus: #c12b8f;
-  --color-selected: #fff0fa;
+  --color-focus: #fb7299;
+  --color-selected: #fff0f5;
 }
 @keyframes progress { 0%, 100% { transform: translateX(-100%); } 50% { transform: translateX(300%); } }
 @layer base {
@@ -15,4 +15,20 @@
   html, body, #root { height: 100%; overflow: hidden; }
   body { margin: 0; min-width: 320px; }
   button, input, select { font: inherit; }
+  [class*="overflow-y-auto"] { scrollbar-gutter: stable; }
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #fb7299;
 }

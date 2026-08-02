@@ -93,12 +93,12 @@ export default function App() {
     <div className="mx-auto grid h-full max-w-4xl grid-rows-[auto_minmax(0,1fr)_auto] px-4 py-4 sm:px-6">
       <header className="flex items-start justify-between gap-4 border-b border-slate-200 pb-3">
         <div className="min-w-0">
-          <div className="flex items-center gap-3"><span aria-hidden className="h-6 w-1 rounded-sm bg-display-accent ring-1 ring-primary" /><h1 className="text-2xl font-semibold">Soufmer</h1></div>
+          <div className="flex items-center gap-3"><span aria-hidden className="h-6 w-1.5 rounded-full bg-gradient-to-b from-primary to-display-accent shadow-xs shadow-pink-300" /><h1 className="text-2xl font-semibold tracking-tight text-slate-900">Soufmer</h1></div>
           <p className="mt-1 max-w-xl text-sm leading-5 text-slate-600">{t("app.description")}</p>
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-1"><Button type="button" variant="ghost" size="sm" onClick={() => setLicenseOpen(true)}>{t("license.open")}</Button><Button type="button" variant="ghost" size="sm" onClick={switchLanguage}>{t("app.switchLanguage")}</Button></div>
       </header>
-      <section className="min-h-0 overflow-y-auto py-3 pr-1">
+      <section className="min-h-0 overflow-y-auto py-3 pr-2">
         {idle && <Card><CardContent className="p-4"><MainForm formId={mainFormId} settings={idle.settings} onSubmit={(request: StartBatchRequest) => dispatch({ type: "startRequested", request })} onSettingsChange={persistSettings} onChooseInput={chooseInput} onChooseOutput={chooseOutputDirectory} submitDisabled={!listenersReady || idle.environment.type !== "ready"} /></CardContent></Card>}
         {import.meta.env.DEV && !isDesktopBridge() && <div className="mt-3 space-y-2"><p className="text-center text-xs text-slate-500">{t("development.browserFallback")}</p><div className="flex flex-wrap justify-center gap-2"><Button type="button" size="sm" variant="outline" onClick={() => dispatch({ type: "developmentCompleted", result: { taskId: "browser-cancelled", succeeded: 0, failed: 0, skipped: 0, outputDirectory: "", cancelled: true, items: [] } })}>{t("development.previewCancelled")}</Button><Button type="button" size="sm" variant="outline" onClick={() => dispatch({ type: "failed", error: { code: "ENV_NOT_INITIALIZED", stage: "runtime", messageKey: "error.environmentNotInitialized", recoverable: true, diagnosticId: "browser-preview" } })}>{t("development.previewError")}</Button></div></div>}
       </section>
