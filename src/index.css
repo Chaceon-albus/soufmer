@@ -13,7 +13,7 @@
 @keyframes progress { 0%, 100% { transform: translateX(-100%); } 50% { transform: translateX(300%); } }
 @layer base {
   * { box-sizing: border-box; }
-  html, body, #root { height: 100%; overflow: hidden; }
+  html, body, #root { overflow: hidden; background-color: #f8fafc; }
   body { margin: 0; min-width: 320px; }
   button, input, select { font: inherit; }
   [class*="overflow-y-auto"] { scrollbar-gutter: stable; }

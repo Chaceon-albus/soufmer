@@ -38,9 +38,11 @@ pub fn run() {
         .setup(move |app| {
             tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
                 .title("Soufmer")
-                .inner_size(760.0, 720.0)
-                .min_inner_size(760.0, 720.0)
-                .resizable(true)
+                .inner_size(760.0, 475.0)
+                .min_inner_size(760.0, 300.0)
+                .resizable(false)
+                .maximizable(false)
+                .visible(false)
                 .data_directory(webview_data)
                 .build()?;
             Ok(())
@@ -55,6 +57,7 @@ pub fn run() {
             commands::cancel_active_task,
             commands::get_diagnostic_report,
             commands::get_license_notices,
+            commands::set_window_content_height,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Soufmer application");

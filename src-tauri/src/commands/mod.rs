@@ -113,6 +113,36 @@ pub fn get_license_notices() -> Vec<crate::diagnostics::LicenseNotice> {
     crate::diagnostics::license_notices()
 }
 
+#[tauri::command]
+pub fn set_window_content_height(
+    window: tauri::WebviewWindow,
+    height: f64,
+) -> Result<(), AppError> {
+    let min_logical_height = 300.0;
+    let max_logical_height = 900.0;
+
+    let clamped_height = height.clamp(min_logical_height, max_logical_height);
+
+    let current_inner = match window.inner_size() {
+        Ok(s) => s,
+        Err(_) => return Ok(()),
+    };
+
+    let scale_factor = window.scale_factor().unwrap_or(1.0);
+    let target_inner_physical_height = (clamped_height * scale_factor).round() as u32;
+
+    if (current_inner.height as i32 - target_inner_physical_height as i32).abs() > 2 {
+        let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize {
+            width: 760.0,
+            height: clamped_height,
+        }));
+    }
+
+    let _ = window.show();
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

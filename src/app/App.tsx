@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useBackendEvents } from "@/hooks/use-backend-events";
 import { useSettingsPersistence } from "@/hooks/use-settings-persistence";
+import { useWindowAutoHeight } from "@/hooks/use-window-auto-height";
 import { formatBytes } from "@/lib/format";
 import { cancelActiveTask, chooseFolder, chooseInputFile, chooseOutputDirectory, getAppSettings, getEnvironmentStatus, initializeEnvironment, isDesktopBridge, revealOutputDirectory, startBatch, toAppError } from "@/lib/ipc";
 import type { BatchProgress, EnvironmentStatus, InitializationActivity, InitializationProgress, StartBatchRequest } from "@/types/domain";
@@ -26,6 +27,9 @@ const mainFormId = "main-batch-form";
 export default function App() {
   const { t, i18n } = useTranslation();
   const [state, dispatch] = useReducer(appReducer, { type: "booting" } as AppState);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const currentEnvironment = state.type === "booting" ? mockEnvironment : state.environment ?? mockEnvironment;
+  useWindowAutoHeight(contentRef, { deps: [i18n.language, state.type, currentEnvironment.type] });
   const [licenseOpen, setLicenseOpen] = useState(false);
   const [cancellationConfirmation, setCancellationConfirmation] = useState<{ taskId: string; mode: "initializing" | "processing" }>();
   const cancellationStartedForTask = useRef<string | undefined>(undefined);
@@ -96,12 +100,11 @@ export default function App() {
   const persistSettings = useCallback((settings: import("@/types/domain").AppSettings) => { dispatch({ type: "settingsUpdated", settings }); queueSettingsSave(settings); }, [queueSettingsSave]);
   const switchLanguage = useCallback(() => { const locale = i18n.language === "zh-CN" ? "en" : "zh-CN"; void i18n.changeLanguage(locale); if (state.type !== "booting" && state.settings) persistSettings({ ...state.settings, locale }); }, [i18n, persistSettings, state]);
 
-  const currentEnvironment = state.type === "booting" ? mockEnvironment : state.environment ?? mockEnvironment;
   const currentSettings = state.type === "booting" ? defaultSettings : state.settings ?? defaultSettings;
   const isBusy = state.type === "initializing" || state.type === "processing" || state.type === "cancelling" || state.type === "validating";
 
-  return <main className="h-dvh overflow-hidden bg-slate-50 text-slate-900">
-    <div className="mx-auto flex h-full max-w-4xl flex-col px-4 py-4 sm:px-6">
+  return <main className="w-full bg-slate-50 text-slate-900">
+    <div ref={contentRef} className="mx-auto flex w-full max-w-4xl flex-col px-4 py-4 sm:px-6 space-y-3.5">
       <header className="flex items-center justify-between gap-4 border-b border-slate-200 pb-3 pr-2 shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
           <span aria-hidden className="h-4.5 w-1.5 shrink-0 rounded-full bg-gradient-to-b from-primary to-display-accent shadow-xs shadow-pink-300" />
@@ -112,13 +115,9 @@ export default function App() {
           <Button type="button" variant="ghost" size="sm" onClick={switchLanguage}>{t("app.switchLanguage")}</Button>
         </div>
       </header>
-      <div className="min-h-0 flex-1 overflow-y-auto py-3.5 pr-2 space-y-3.5">
-        {state.type !== "booting" && <>
-          <Card><CardContent className="p-4"><MainForm formId={mainFormId} settings={currentSettings} onSubmit={(request: StartBatchRequest) => dispatch({ type: "startRequested", request })} onSettingsChange={persistSettings} onChooseInput={chooseInput} onChooseOutput={chooseOutputDirectory} submitDisabled={!listenersReady || currentEnvironment.type !== "ready" || isBusy} /></CardContent></Card>
-          <EnvironmentStatusCard status={currentEnvironment} onInitialize={requestInitialization} disabled={!listenersReady || isBusy} />
-        </>}
-        {import.meta.env.DEV && !isDesktopBridge() && <div className="mt-3 space-y-2"><p className="text-center text-xs text-slate-500">{t("development.browserFallback")}</p><div className="flex flex-wrap justify-center gap-2"><Button type="button" size="sm" variant="outline" onClick={() => dispatch({ type: "developmentCompleted", result: { taskId: "browser-cancelled", succeeded: 0, failed: 0, skipped: 0, outputDirectory: "", cancelled: true, items: [] } })}>{t("development.previewCancelled")}</Button><Button type="button" size="sm" variant="outline" onClick={() => dispatch({ type: "failed", error: { code: "ENV_NOT_INITIALIZED", stage: "runtime", messageKey: "error.environmentNotInitialized", recoverable: true, diagnosticId: "browser-preview" } })}>{t("development.previewError")}</Button></div></div>}
-      </div>
+      <Card><CardContent className="p-4"><MainForm formId={mainFormId} settings={currentSettings} onSubmit={(request: StartBatchRequest) => dispatch({ type: "startRequested", request })} onSettingsChange={persistSettings} onChooseInput={chooseInput} onChooseOutput={chooseOutputDirectory} submitDisabled={state.type === "booting" || !listenersReady || currentEnvironment.type !== "ready" || isBusy} /></CardContent></Card>
+      <EnvironmentStatusCard status={currentEnvironment} onInitialize={requestInitialization} disabled={state.type === "booting" || !listenersReady || isBusy} />
+      {import.meta.env.DEV && !isDesktopBridge() && <div className="mt-3 space-y-2"><p className="text-center text-xs text-slate-500">{t("development.browserFallback")}</p><div className="flex flex-wrap justify-center gap-2"><Button type="button" size="sm" variant="outline" onClick={() => dispatch({ type: "developmentCompleted", result: { taskId: "browser-cancelled", succeeded: 0, failed: 0, skipped: 0, outputDirectory: "", cancelled: true, items: [] } })}>{t("development.previewCancelled")}</Button><Button type="button" size="sm" variant="outline" onClick={() => dispatch({ type: "failed", error: { code: "ENV_NOT_INITIALIZED", stage: "runtime", messageKey: "error.environmentNotInitialized", recoverable: true, diagnosticId: "browser-preview" } })}>{t("development.previewError")}</Button></div></div>}
     </div>
     {licenseOpen && <LicenseDialog onClose={() => setLicenseOpen(false)} />}
     {state.type === "awaitingInitializationConsent" && <InitializationConsent environment={state.environment} onAccept={beginInitialization} onDecline={dismiss} />}

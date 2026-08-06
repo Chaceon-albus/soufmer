@@ -49,5 +49,6 @@ export async function chooseOutputDirectory() { return chooseFolder(); }
 export async function revealOutputDirectory(path: string) { if (isDesktopBridge() && path) await revealItemInDir(path); }
 export async function subscribe(name: BackendEventName, handler: (payload: unknown) => void): Promise<UnlistenFn> { return isDesktopBridge() ? listen(name, (event) => handler(event.payload)) : () => undefined; }
 export async function inspectPath(path: string): Promise<PathKindInfo | null> { if (!isDesktopBridge() || !path) return null; return command("inspect_path", { path }, pathKindInfoSchema); }
+export async function setWindowContentHeight(height: number): Promise<void> { if (isDesktopBridge()) await command("set_window_content_height", { height }, z.null()); }
 export function toBatchResult(value: unknown): BatchResult { return batchResultSchema.parse(value); }
 
