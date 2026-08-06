@@ -182,4 +182,11 @@ describe("appReducer", () => {
       result: { cancelled: true, outputDirectory: request.outputDirectory },
     });
   });
+  it("dismisses awaitingInitializationConsent state back to idle", () => {
+    const awaiting: AppState = { type: "awaitingInitializationConsent", request, environment: { type: "notInstalled" }, settings: defaultSettings };
+    expect(appReducer(awaiting, { type: "dismissed", environment: awaiting.environment, settings: awaiting.settings })).toMatchObject({
+      type: "idle",
+      environment: { type: "notInstalled" },
+    });
+  });
 });

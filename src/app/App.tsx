@@ -99,12 +99,15 @@ export default function App() {
 
   return <main className="h-dvh overflow-hidden bg-slate-50 text-slate-900">
     <div className="mx-auto flex h-full max-w-4xl flex-col px-4 py-4 sm:px-6">
-      <header className="flex items-start justify-between gap-4 border-b border-slate-200 pb-3 pr-2 shrink-0">
-        <div className="min-w-0">
-          <div className="flex items-center gap-3"><span aria-hidden className="h-6 w-1.5 rounded-full bg-gradient-to-b from-primary to-display-accent shadow-xs shadow-pink-300" /><h1 className="text-2xl font-semibold tracking-tight text-slate-900">Soufmer</h1></div>
-          <p className="mt-1 max-w-xl text-sm leading-5 text-slate-600">{t("app.description")}</p>
+      <header className="flex items-center justify-between gap-4 border-b border-slate-200 pb-3 pr-2 shrink-0">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span aria-hidden className="h-4.5 w-1.5 shrink-0 rounded-full bg-gradient-to-b from-primary to-display-accent shadow-xs shadow-pink-300" />
+          <h1 className="text-sm font-medium text-slate-700">{t("app.description")}</h1>
         </div>
-        <div className="flex shrink-0 flex-wrap justify-end gap-1"><Button type="button" variant="ghost" size="sm" onClick={() => setLicenseOpen(true)}>{t("license.open")}</Button><Button type="button" variant="ghost" size="sm" onClick={switchLanguage}>{t("app.switchLanguage")}</Button></div>
+        <div className="flex shrink-0 items-center gap-1">
+          <Button type="button" variant="ghost" size="sm" onClick={() => setLicenseOpen(true)}>{t("license.open")}</Button>
+          <Button type="button" variant="ghost" size="sm" onClick={switchLanguage}>{t("app.switchLanguage")}</Button>
+        </div>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto py-3.5 pr-2 space-y-3.5">
         {idle && <>

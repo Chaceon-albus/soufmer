@@ -324,8 +324,7 @@ export function MainForm({
       <div className="flex items-center gap-3 pt-1">
         <Button
           type="submit"
-          size="lg"
-          className="h-11 flex-1 text-base font-semibold shadow-2xs hover:shadow-xs transition-all active:scale-[0.995]"
+          className="h-11 min-h-11 flex-1 text-base font-semibold shadow-2xs hover:shadow-xs transition-all active:scale-[0.995]"
           disabled={submitDisabled}
         >
           <Sparkles className="size-4.5" />
@@ -333,7 +332,7 @@ export function MainForm({
         </Button>
         <Popover>
           <PopoverTrigger asChild>
-            <Button type="button" variant="outline" className="h-11 shrink-0 gap-2 border-slate-200/90 hover:border-pink-200">
+            <Button type="button" variant="outline" className="h-11 min-h-11 shrink-0 gap-2 border-slate-200/90 hover:border-pink-200">
               <SlidersHorizontal className="size-4 text-primary" />
               <span>{t("advanced.title")}</span>
             </Button>
