@@ -31,7 +31,6 @@ export default function App() {
   const cancellationStartedForTask = useRef<string | undefined>(undefined);
   const initializationEventBridge = useRef<InitializationEventBridge | undefined>(undefined);
   const { schedule: queueSettingsSave } = useSettingsPersistence();
-  const idle = state.type === "idle" ? state : undefined;
   const dispatchInitializationEvent = useCallback((event: BufferedInitializationEvent) => {
     const bridge = initializationEventBridge.current;
     if (!bridge) return false;
@@ -97,6 +96,10 @@ export default function App() {
   const persistSettings = useCallback((settings: import("@/types/domain").AppSettings) => { dispatch({ type: "settingsUpdated", settings }); queueSettingsSave(settings); }, [queueSettingsSave]);
   const switchLanguage = useCallback(() => { const locale = i18n.language === "zh-CN" ? "en" : "zh-CN"; void i18n.changeLanguage(locale); if (state.type !== "booting" && state.settings) persistSettings({ ...state.settings, locale }); }, [i18n, persistSettings, state]);
 
+  const currentEnvironment = state.type === "booting" ? mockEnvironment : state.environment ?? mockEnvironment;
+  const currentSettings = state.type === "booting" ? defaultSettings : state.settings ?? defaultSettings;
+  const isBusy = state.type === "initializing" || state.type === "processing" || state.type === "cancelling" || state.type === "validating";
+
   return <main className="h-dvh overflow-hidden bg-slate-50 text-slate-900">
     <div className="mx-auto flex h-full max-w-4xl flex-col px-4 py-4 sm:px-6">
       <header className="flex items-center justify-between gap-4 border-b border-slate-200 pb-3 pr-2 shrink-0">
@@ -110,9 +113,9 @@ export default function App() {
         </div>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto py-3.5 pr-2 space-y-3.5">
-        {idle && <>
-          <Card><CardContent className="p-4"><MainForm formId={mainFormId} settings={idle.settings} onSubmit={(request: StartBatchRequest) => dispatch({ type: "startRequested", request })} onSettingsChange={persistSettings} onChooseInput={chooseInput} onChooseOutput={chooseOutputDirectory} submitDisabled={!listenersReady || idle.environment.type !== "ready"} /></CardContent></Card>
-          <EnvironmentStatusCard status={idle.environment} onInitialize={requestInitialization} disabled={!listenersReady} />
+        {state.type !== "booting" && <>
+          <Card><CardContent className="p-4"><MainForm formId={mainFormId} settings={currentSettings} onSubmit={(request: StartBatchRequest) => dispatch({ type: "startRequested", request })} onSettingsChange={persistSettings} onChooseInput={chooseInput} onChooseOutput={chooseOutputDirectory} submitDisabled={!listenersReady || currentEnvironment.type !== "ready" || isBusy} /></CardContent></Card>
+          <EnvironmentStatusCard status={currentEnvironment} onInitialize={requestInitialization} disabled={!listenersReady || isBusy} />
         </>}
         {import.meta.env.DEV && !isDesktopBridge() && <div className="mt-3 space-y-2"><p className="text-center text-xs text-slate-500">{t("development.browserFallback")}</p><div className="flex flex-wrap justify-center gap-2"><Button type="button" size="sm" variant="outline" onClick={() => dispatch({ type: "developmentCompleted", result: { taskId: "browser-cancelled", succeeded: 0, failed: 0, skipped: 0, outputDirectory: "", cancelled: true, items: [] } })}>{t("development.previewCancelled")}</Button><Button type="button" size="sm" variant="outline" onClick={() => dispatch({ type: "failed", error: { code: "ENV_NOT_INITIALIZED", stage: "runtime", messageKey: "error.environmentNotInitialized", recoverable: true, diagnosticId: "browser-preview" } })}>{t("development.previewError")}</Button></div></div>}
       </div>
