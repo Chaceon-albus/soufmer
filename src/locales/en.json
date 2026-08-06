@@ -16,12 +16,14 @@
       "path": "Input path",
       "placeholder": "Select or drop audio file / folder",
       "chooseFile": "Browse",
-      "chooseFolder": "Browse"
+      "chooseFolder": "Browse",
+      "dropHint": "Release to set as input path"
     },
     "output": {
       "label": "Output location",
       "placeholder": "Select output directory",
-      "choose": "Browse"
+      "choose": "Browse",
+      "dropHint": "Release to set as output location"
     },
     "mode": {
       "label": "Processing mode",

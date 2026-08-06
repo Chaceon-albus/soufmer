@@ -16,12 +16,14 @@
       "path": "输入路径",
       "placeholder": "请选择或拖入音频文件 / 文件夹",
       "chooseFile": "浏览",
-      "chooseFolder": "浏览"
+      "chooseFolder": "浏览",
+      "dropHint": "松开以设置为输入路径"
     },
     "output": {
       "label": "保存位置",
       "placeholder": "请选择伴奏输出目录",
-      "choose": "浏览"
+      "choose": "浏览",
+      "dropHint": "松开以设置为保存位置"
     },
     "mode": {
       "label": "提取模式",

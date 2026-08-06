@@ -235,6 +235,16 @@ pub struct BatchResult {
     pub items: Vec<BatchItemResult>,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PathKindInfo {
+    pub exists: bool,
+    pub is_dir: bool,
+    pub is_file: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_dir: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::{AppSettings, EnvironmentStatus, ProgressValue};

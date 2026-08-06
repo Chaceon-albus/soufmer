@@ -1,13 +1,55 @@
 use crate::{
     domain::{
-        AppError, AppSettings, CancelTaskRequest, EnvironmentStatus, StartBatchRequest,
-        TaskAcknowledgement,
+        AppError, AppSettings, CancelTaskRequest, EnvironmentStatus, PathKindInfo,
+        StartBatchRequest, TaskAcknowledgement,
     },
     runtime::{AppPaths, environment_status, load_settings, save_settings},
     task::{TaskManager, start_batch as start_batch_task, start_initialization},
 };
 use std::sync::Arc;
 use tauri::{AppHandle, State};
+
+#[tauri::command]
+pub fn inspect_path(path: String) -> Result<PathKindInfo, AppError> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return Ok(PathKindInfo {
+            exists: false,
+            is_dir: false,
+            is_file: false,
+            parent_dir: None,
+        });
+    }
+    let p = std::path::Path::new(trimmed);
+    if !p.exists() {
+        return Ok(PathKindInfo {
+            exists: false,
+            is_dir: false,
+            is_file: false,
+            parent_dir: None,
+        });
+    }
+    let metadata = match std::fs::metadata(p) {
+        Ok(m) => m,
+        Err(e) => {
+            return Err(AppError::new(
+                crate::domain::ErrorCode::InputUnsupported,
+                e.to_string(),
+            ));
+        }
+    };
+    let parent_dir = if metadata.is_file() {
+        p.parent().map(|parent| parent.to_string_lossy().to_string())
+    } else {
+        Some(trimmed.to_string())
+    };
+    Ok(PathKindInfo {
+        exists: true,
+        is_dir: metadata.is_dir(),
+        is_file: metadata.is_file(),
+        parent_dir,
+    })
+}
 
 #[tauri::command]
 pub fn get_environment_status() -> Result<EnvironmentStatus, AppError> {
@@ -70,3 +112,21 @@ pub fn get_diagnostic_report(diagnostic_id: String) -> Result<String, AppError> 
 pub fn get_license_notices() -> Vec<crate::diagnostics::LicenseNotice> {
     crate::diagnostics::license_notices()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn inspect_path_reports_correct_metadata() {
+        let temp_dir = std::env::temp_dir();
+        let info = inspect_path(temp_dir.to_string_lossy().to_string()).unwrap();
+        assert!(info.exists);
+        assert!(info.is_dir);
+        assert!(!info.is_file);
+
+        let non_existent = inspect_path("C:\\non_existent_folder_xyz_123".into()).unwrap();
+        assert!(!non_existent.exists);
+    }
+}
+

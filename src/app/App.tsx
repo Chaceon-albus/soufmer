@@ -54,6 +54,15 @@ export default function App() {
   const listenersReady = useBackendEvents(handlers);
 
   useEffect(() => { void Promise.all([getEnvironmentStatus(), getAppSettings()]).then(([environment, settings]) => { void i18n.changeLanguage(settings.locale); dispatch({ type: "booted", environment, settings }); }).catch((error: unknown) => dispatch({ type: "failed", error: toAppError(error) })); }, [i18n]);
+  useEffect(() => {
+    const preventDefault = (e: DragEvent) => { e.preventDefault(); };
+    window.addEventListener("dragover", preventDefault);
+    window.addEventListener("drop", preventDefault);
+    return () => {
+      window.removeEventListener("dragover", preventDefault);
+      window.removeEventListener("drop", preventDefault);
+    };
+  }, []);
   useEffect(() => { if (state.type !== "validating") return; void getEnvironmentStatus().then((environment) => { if (environment.type !== "ready") { dispatch({ type: "validationNeedsInitialization", environment }); return; } return startBatch(state.request).then((acknowledgement) => dispatch({ type: "validationPassed", taskId: acknowledgement.taskId, progress: batchPlaceholder })); }).catch((error: unknown) => { const appError = toAppError(error); if (appError.code === "ENV_NOT_INITIALIZED") { void getEnvironmentStatus().then((environment) => dispatch({ type: "environmentNotReady", environment })); return; } dispatch({ type: "failed", error: appError }); }); }, [state]);
 
   const requestInitialization = useCallback(() => { if (listenersReady) dispatch({ type: "initializationRequested" }); }, [listenersReady]);

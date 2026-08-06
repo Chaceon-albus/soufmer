@@ -46,6 +46,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::inspect_path,
             commands::get_environment_status,
             commands::get_app_settings,
             commands::save_app_settings,

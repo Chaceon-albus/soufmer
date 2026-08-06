@@ -3,10 +3,11 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { z } from "zod";
-import { appSettingsSchema, backendErrorSchema, batchResultSchema, diagnosticReportSchema, environmentStatusSchema, licenseNoticesSchema, taskAcknowledgementSchema } from "@/types/backend";
-import type { LicenseNotice } from "@/types/backend";
+import { appSettingsSchema, backendErrorSchema, batchResultSchema, diagnosticReportSchema, environmentStatusSchema, licenseNoticesSchema, pathKindInfoSchema, taskAcknowledgementSchema } from "@/types/backend";
+import type { LicenseNotice, PathKindInfo } from "@/types/backend";
 import type { AppError, AppSettings, BatchResult, EnvironmentStatus, StartBatchRequest } from "@/types/domain";
 import { defaultSettings, mockEnvironment } from "@/app/app-state";
+
 
 export const eventNames = ["runtime://progress", "runtime://activity", "runtime://completed", "batch://progress", "batch://item-completed", "batch://completed", "task://failed", "task://cancelled"] as const;
 export const supportedAudioExtensions = ["wav", "flac", "mp3", "m4a", "aac", "ogg", "opus", "aiff", "aif", "wma"] as const;
@@ -47,4 +48,6 @@ export async function chooseFolder() { return isDesktopBridge() ? open({ multipl
 export async function chooseOutputDirectory() { return chooseFolder(); }
 export async function revealOutputDirectory(path: string) { if (isDesktopBridge() && path) await revealItemInDir(path); }
 export async function subscribe(name: BackendEventName, handler: (payload: unknown) => void): Promise<UnlistenFn> { return isDesktopBridge() ? listen(name, (event) => handler(event.payload)) : () => undefined; }
+export async function inspectPath(path: string): Promise<PathKindInfo | null> { if (!isDesktopBridge() || !path) return null; return command("inspect_path", { path }, pathKindInfoSchema); }
 export function toBatchResult(value: unknown): BatchResult { return batchResultSchema.parse(value); }
+
