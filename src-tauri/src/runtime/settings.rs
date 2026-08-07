@@ -1,15 +1,40 @@
-use crate::domain::{APP_SETTINGS_SCHEMA_VERSION, AppError, AppSettings, ErrorCode};
+use crate::domain::{APP_SETTINGS_SCHEMA_VERSION, AppError, AppSettings, ErrorCode, Locale};
 use std::{fs, io, os::windows::ffi::OsStrExt, path::Path};
 use uuid::Uuid;
 use windows_sys::Win32::Storage::FileSystem::ReplaceFileW;
 
+pub fn detect_system_locale() -> Locale {
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::Globalization::GetUserDefaultLocaleName;
+        let mut buffer = [0u16; 85];
+        let len = unsafe { GetUserDefaultLocaleName(buffer.as_mut_ptr(), buffer.len() as i32) };
+        if len > 1 {
+            let name = String::from_utf16_lossy(&buffer[..((len - 1) as usize)]);
+            if name.to_lowercase().starts_with("zh") {
+                return Locale::ZhCn;
+            } else {
+                return Locale::En;
+            }
+        }
+    }
+    Locale::ZhCn
+}
+
+pub fn default_settings_with_system_locale() -> AppSettings {
+    AppSettings {
+        locale: detect_system_locale(),
+        ..AppSettings::default()
+    }
+}
+
 pub fn load_settings(path: &Path) -> AppSettings {
     let Ok(contents) = fs::read_to_string(path) else {
-        return AppSettings::default();
+        return default_settings_with_system_locale();
     };
     match serde_json::from_str::<AppSettings>(&contents) {
         Ok(settings) if settings.schema_version == APP_SETTINGS_SCHEMA_VERSION => settings,
-        _ => AppSettings::default(),
+        _ => default_settings_with_system_locale(),
     }
 }
 pub fn save_settings(path: &Path, settings: &AppSettings) -> Result<AppSettings, AppError> {

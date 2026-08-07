@@ -11,5 +11,15 @@ export type AppState =
   | { type: "completed"; result: BatchResult; environment: EnvironmentStatus; settings: AppSettings }
   | { type: "failed"; error: AppError; environment: EnvironmentStatus; settings: AppSettings; initializationRequest?: StartBatchRequest };
 
-export const defaultSettings: AppSettings = { schemaVersion: 1, locale: "zh-CN", lastInputMode: "file", processingMode: "compatibility44100", recursive: true, preserveDirectoryStructure: true, conflictPolicy: "skip", outputFormat: "flac", generateBothModes: false };
+export function detectSystemLocale(): "zh-CN" | "en" {
+  if (typeof navigator !== "undefined" && navigator.language) {
+    if (navigator.language.toLowerCase().startsWith("zh")) {
+      return "zh-CN";
+    }
+    return "en";
+  }
+  return "zh-CN";
+}
+
+export const defaultSettings: AppSettings = { schemaVersion: 1, locale: detectSystemLocale(), lastInputMode: "file", processingMode: "compatibility44100", recursive: true, preserveDirectoryStructure: true, conflictPolicy: "skip", outputFormat: "flac", generateBothModes: false };
 export const mockEnvironment: EnvironmentStatus = { type: "notInstalled", estimatedDownloadBytes: 3_800_000_000, estimatedDiskBytes: 7_000_000_000 };
